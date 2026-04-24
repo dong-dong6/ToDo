@@ -1,0 +1,16 @@
+name = "cloudflare-wireframe-todo"
+compatibility_date = "2026-04-24"
+pages_build_output_dir = "./dist"
+
+[vars]
+APP_NAME = "Wireframe Todo"
+
+[[d1_databases]]
+binding = "TODO_DB"
+database_name = "todo-db"
+database_id = "4f8ccfe5-c608-43ac-a009-99e2877ce48d"
+
+[[r2_buckets]]
+binding = "TODO_ATTACHMENTS"
+bucket_name = "todo-snapshots"
+preview_bucket_name = "todo-snapshots"
