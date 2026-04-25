@@ -334,6 +334,26 @@ function TimelineGroup(props: {
   )
 }
 
+function CompletedGroupTrigger(props: { count: number; onOpen: () => void }) {
+  return (
+    <section className="rounded-lg border-2 border-line bg-[#fff8ef] shadow-stamp">
+      <button
+        type="button"
+        onClick={props.onOpen}
+        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition hover:bg-white/50"
+      >
+        <div>
+          <p className="text-[11px] font-medium text-smoke">任务状态</p>
+          <h3 className="mt-1 text-base font-bold leading-5 text-ink">已完成</h3>
+        </div>
+        <span className="shrink-0 rounded-md border border-line bg-white px-3 py-1.5 text-xs text-smoke">
+          查看 · {props.count} 项
+        </span>
+      </button>
+    </section>
+  )
+}
+
 function CompletedTaskModal(props: {
   todos: Todo[]
   dateValue: string
@@ -874,15 +894,6 @@ export default function App() {
                 <span className="rounded-md border border-dashed border-line px-3 py-1.5 text-xs text-smoke">
                   {openTodos.length} 项待办
                 </span>
-                {doneTodos.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setCompletedModalOpen(true)}
-                    className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper"
-                  >
-                    已完成 {doneTodos.length}
-                  </button>
-                )}
               </div>
 
               {(error || notice) && (
@@ -929,6 +940,13 @@ export default function App() {
                 <div className="rounded-lg border-2 border-dashed border-line bg-white px-6 py-10 text-center">
                   <p className="text-sm text-smoke">当前没有待完成任务</p>
                 </div>
+              )}
+
+              {doneTodos.length > 0 && (
+                <CompletedGroupTrigger
+                  count={doneTodos.length}
+                  onOpen={() => setCompletedModalOpen(true)}
+                />
               )}
             </div>
           </section>
