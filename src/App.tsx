@@ -778,29 +778,22 @@ export default function App() {
                 <div className="new-task-meta grid gap-3 sm:grid-cols-2">
                   <div className="block">
                     <span className="mb-1 block text-xs font-medium text-smoke">标签配置</span>
-                    <div className="flex gap-2">
+                    <div>
                       <input
                         value={form.tagInput}
+                        disabled={form.tags.length >= 6}
                         onChange={(event) =>
                           setForm((current) => ({ ...current, tagInput: event.target.value }))
                         }
                         onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
+                          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
                             event.preventDefault()
                             addFormTag()
                           }
                         }}
-                        placeholder="输入标签"
-                        className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
+                        placeholder={form.tags.length >= 6 ? '标签已满' : '输入标签后按回车'}
+                        className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                       />
-                      <button
-                        type="button"
-                        disabled={form.tags.length >= 6}
-                        onClick={addFormTag}
-                        className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink transition hover:bg-sand disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        添加
-                      </button>
                     </div>
 
                     {form.tags.length > 0 && (
