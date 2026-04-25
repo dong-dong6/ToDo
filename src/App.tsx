@@ -15,24 +15,45 @@ const priorityTone: Record<Priority, string> = {
   high: 'bg-clay text-white',
 }
 
-function normalizeDateKey(value: string | null) {
-  if (!value) {
-    return 'no-date'
-  }
+function toLocalDateKey(value: string | Date) {
+  const date = typeof value === 'string' ? new Date(value) : value
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
 
-  return value.slice(0, 10)
+  return `${year}-${month}-${day}`
 }
 
-function formatDateLabel(value: string | null) {
+function dateFromKey(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function formatTaskDateLabel(value: string) {
+  const today = toLocalDateKey(new Date())
+  const dateText = new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  }).format(dateFromKey(value))
+
+  if (value === today) {
+    return `今天 · ${dateText}`
+  }
+
+  return dateText
+}
+
+function formatDeadlineLabel(value: string | null) {
   if (!value) {
-    return '未安排日期'
+    return null
   }
 
   return new Intl.DateTimeFormat('zh-CN', {
     month: 'long',
     day: 'numeric',
     weekday: 'short',
-  }).format(new Date(value))
+  }).format(dateFromKey(value))
 }
 
 function formatDateTime(value: string) {
@@ -54,53 +75,37 @@ function formatBytes(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function compareDateKeys(a: string, b: string) {
-  if (a === 'no-date' && b === 'no-date') {
-    return 0
-  }
-
-  if (a === 'no-date') {
-    return 1
-  }
-
-  if (b === 'no-date') {
-    return -1
-  }
-
-  return a.localeCompare(b)
-}
-
 function buildTimeline(todos: Todo[]) {
   const groups = new Map<string, Todo[]>()
 
   for (const todo of todos) {
-    const key = normalizeDateKey(todo.dueDate)
+    const key = toLocalDateKey(todo.createdAt)
     const list = groups.get(key) ?? []
     list.push(todo)
     groups.set(key, list)
   }
 
   return Array.from(groups.entries())
-    .sort(([left], [right]) => compareDateKeys(left, right))
+    .sort(([left], [right]) => right.localeCompare(left))
     .map(([key, items]) => ({
       key,
-      label: key === 'no-date' ? '未安排日期' : formatDateLabel(key),
+      label: formatTaskDateLabel(key),
       items: items.sort((left, right) => {
         if (left.priority !== right.priority) {
           const rank = { high: 0, medium: 1, low: 2 }
           return rank[left.priority] - rank[right.priority]
         }
 
-        return left.createdAt.localeCompare(right.createdAt)
+        return right.createdAt.localeCompare(left.createdAt)
       }),
     }))
 }
 
 function StatCard(props: { label: string; value: number }) {
   return (
-    <div className="rounded-[24px] border-2 border-line bg-white px-4 py-4 shadow-stamp">
-      <p className="text-xs tracking-[0.24em] text-smoke">{props.label}</p>
-      <p className="mt-3 text-3xl font-bold leading-none text-ink">{props.value}</p>
+    <div className="rounded-lg border border-line bg-white px-3 py-2">
+      <p className="text-[11px] font-medium text-smoke">{props.label}</p>
+      <p className="mt-1 text-xl font-bold leading-none text-ink">{props.value}</p>
     </div>
   )
 }
@@ -113,14 +118,14 @@ function FilterTabs(props: { value: TodoFilter; onChange: (value: TodoFilter) =>
   ]
 
   return (
-    <div className="inline-flex flex-wrap rounded-full border-2 border-line bg-white p-1">
+    <div className="inline-flex flex-wrap rounded-lg border border-line bg-white p-1">
       {items.map((item) => (
         <button
           key={item.value}
           type="button"
           onClick={() => props.onChange(item.value)}
           className={[
-            'rounded-full px-4 py-2 text-sm font-medium transition',
+            'rounded-md px-3 py-1.5 text-sm font-medium transition',
             props.value === item.value ? 'bg-ink text-paper' : 'text-smoke hover:text-ink',
           ].join(' ')}
         >
@@ -135,68 +140,46 @@ function AttachmentList(props: {
   attachments: TodoAttachment[]
   completed: boolean
   busy: boolean
-  uploading: boolean
-  onUpload: (todo: Todo, event: ChangeEvent<HTMLInputElement>) => Promise<void>
   onDelete: (todo: Todo, attachment: TodoAttachment) => Promise<void>
   todo: Todo
 }) {
+  if (props.attachments.length === 0) {
+    return null
+  }
+
   return (
-    <div className="mt-4 rounded-[18px] border border-dashed border-line bg-[#fcfaf5] p-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-smoke">
-          {props.attachments.length > 0
-            ? `附件 ${props.attachments.length} 个`
-            : '暂无附件'}
-        </p>
-
-        {!props.completed && (
-          <label className="inline-flex cursor-pointer items-center justify-center rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-sand">
-            {props.uploading ? '上传中...' : '上传附件'}
-            <input
-              type="file"
-              className="hidden"
-              disabled={props.busy || props.uploading}
-              onChange={(event) => void props.onUpload(props.todo, event)}
-            />
-          </label>
-        )}
-      </div>
-
-      {props.attachments.length > 0 && (
-        <div className="mt-3 space-y-2">
-          {props.attachments.map((attachment) => (
-            <div
-              key={attachment.id}
-              className="flex flex-col gap-2 rounded-[16px] border border-line bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+    <div className="mt-3 space-y-2 rounded-lg border border-dashed border-line bg-[#fcfaf5] p-2">
+      {props.attachments.map((attachment) => (
+        <div
+          key={attachment.id}
+          className="flex flex-col gap-2 rounded-md border border-line bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="min-w-0">
+            <a
+              href={attachment.url}
+              target="_blank"
+              rel="noreferrer"
+              className="block truncate text-sm font-semibold text-ink underline-offset-4 hover:underline"
             >
-              <div className="min-w-0">
-                <a
-                  href={attachment.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block truncate text-sm font-semibold text-ink underline-offset-4 hover:underline"
-                >
-                  {attachment.fileName}
-                </a>
-                <p className="mt-1 text-xs text-smoke">
-                  {formatBytes(attachment.sizeBytes)} · {formatDateTime(attachment.createdAt)}
-                </p>
-              </div>
+              {attachment.fileName}
+            </a>
+            <p className="mt-1 text-xs text-smoke">
+              {formatBytes(attachment.sizeBytes)} · {formatDateTime(attachment.createdAt)}
+            </p>
+          </div>
 
-              {!props.completed && (
-                <button
-                  type="button"
-                  disabled={props.busy}
-                  onClick={() => void props.onDelete(props.todo, attachment)}
-                  className="rounded-full border border-line px-3 py-2 text-xs font-medium text-ink transition hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  删除附件
-                </button>
-              )}
-            </div>
-          ))}
+          {!props.completed && (
+            <button
+              type="button"
+              disabled={props.busy}
+              onClick={() => void props.onDelete(props.todo, attachment)}
+              className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              删除
+            </button>
+          )}
         </div>
-      )}
+      ))}
     </div>
   )
 }
@@ -212,18 +195,20 @@ function TodoItem(props: {
   onUpload: (todo: Todo, event: ChangeEvent<HTMLInputElement>) => Promise<void>
   onDeleteAttachment: (todo: Todo, attachment: TodoAttachment) => Promise<void>
 }) {
+  const deadlineLabel = formatDeadlineLabel(props.todo.dueDate)
+
   return (
-    <article className="rounded-[24px] border-2 border-line bg-white p-4 shadow-stamp">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="flex gap-4">
+    <article className="rounded-lg border-2 border-line bg-white p-3 shadow-stamp">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex gap-3">
             <button
               type="button"
               aria-label={props.todo.completed ? '恢复为待办' : '标记为完成'}
               disabled={props.busy}
               onClick={() => void props.onToggle(props.todo)}
               className={[
-                'mt-1 h-6 w-6 shrink-0 rounded-full border-2 border-line transition',
+                'mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 border-line transition',
                 props.todo.completed ? 'bg-moss' : 'bg-paper',
               ].join(' ')}
             >
@@ -232,10 +217,10 @@ function TodoItem(props: {
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-lg font-semibold text-ink">{props.todo.title}</h3>
+                <h3 className="text-base font-semibold leading-6 text-ink">{props.todo.title}</h3>
                 <span
                   className={[
-                    'rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.18em]',
+                    'rounded-md px-2 py-1 text-[11px] font-semibold',
                     priorityTone[props.todo.priority],
                   ].join(' ')}
                 >
@@ -245,17 +230,19 @@ function TodoItem(props: {
                       ? '中'
                       : '低'}
                 </span>
-                <span className="rounded-full border border-dashed border-line px-3 py-1 text-[11px] tracking-[0.18em] text-smoke">
-                  {formatDateLabel(props.todo.dueDate)}
-                </span>
+                {deadlineLabel && (
+                  <span className="rounded-md border border-dashed border-line px-2 py-1 text-[11px] text-smoke">
+                    DDL {deadlineLabel}
+                  </span>
+                )}
               </div>
 
               {!props.compact && props.todo.notes && (
-                <p className="mt-3 text-sm leading-6 text-smoke">{props.todo.notes}</p>
+                <p className="mt-2 text-sm leading-6 text-smoke">{props.todo.notes}</p>
               )}
 
               {props.compact && props.todo.completedAt && (
-                <p className="mt-3 text-sm text-smoke">
+                <p className="mt-2 text-sm text-smoke">
                   完成于 {formatDateTime(props.todo.completedAt)}
                 </p>
               )}
@@ -263,12 +250,24 @@ function TodoItem(props: {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+            {!props.compact && !props.todo.completed && (
+              <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-sand">
+                {props.uploading ? '上传中...' : '附件'}
+                <input
+                  type="file"
+                  className="hidden"
+                  disabled={props.busy || props.uploading}
+                  onChange={(event) => void props.onUpload(props.todo, event)}
+                />
+              </label>
+            )}
+
             {!props.compact && !props.todo.completed && props.onEdit && (
               <button
                 type="button"
                 disabled={props.busy}
                 onClick={() => props.onEdit?.(props.todo)}
-                className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink transition hover:bg-sand disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-sand disabled:cursor-not-allowed disabled:opacity-50"
               >
                 编辑
               </button>
@@ -278,7 +277,7 @@ function TodoItem(props: {
               type="button"
               disabled={props.busy}
               onClick={() => void props.onDelete(props.todo.id)}
-              className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
             >
               删除
             </button>
@@ -289,8 +288,6 @@ function TodoItem(props: {
           attachments={props.todo.attachments}
           completed={props.todo.completed}
           busy={props.busy}
-          uploading={props.uploading}
-          onUpload={props.onUpload}
           onDelete={props.onDeleteAttachment}
           todo={props.todo}
         />
@@ -311,16 +308,16 @@ function TimelineGroup(props: {
   onDeleteAttachment: (todo: Todo, attachment: TodoAttachment) => Promise<void>
 }) {
   return (
-    <section className="grid gap-4 xl:grid-cols-[128px_1fr] xl:gap-5">
+    <section className="grid gap-3 xl:grid-cols-[104px_1fr] xl:gap-4">
       <div className="xl:sticky xl:top-5 xl:self-start">
-        <div className="rounded-[20px] border-2 border-line bg-[#fff8ef] px-4 py-4">
-          <p className="text-xs tracking-[0.22em] text-smoke">日期</p>
-          <h3 className="mt-2 text-lg font-bold text-ink">{props.label}</h3>
+        <div className="rounded-lg border-2 border-line bg-[#fff8ef] px-3 py-3">
+          <p className="text-[11px] font-medium text-smoke">任务日期</p>
+          <h3 className="mt-1 text-sm font-bold leading-5 text-ink">{props.label}</h3>
           <p className="mt-1 text-xs text-smoke">{props.items.length} 项</p>
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {props.items.map((todo) => (
           <TodoItem
             key={todo.id}
@@ -402,6 +399,9 @@ export default function App() {
   }, [filter, doneTodos])
 
   const timeline = useMemo(() => buildTimeline(visibleOpenTodos), [visibleOpenTodos])
+  const filterLabel = filter === 'all' ? '全部' : filter === 'open' ? '待完成' : '已完成'
+  const listCountLabel =
+    filter === 'done' ? `${visibleDoneTodos.length} 项已完成` : `${visibleOpenTodos.length} 项待办`
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -546,29 +546,29 @@ export default function App() {
 
   return (
     <main className="min-h-screen bg-paper text-ink">
-      <div className="mx-auto w-full max-w-[1800px] px-3 py-3 md:px-4 xl:px-5">
-        <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
-          <aside className="flex flex-col gap-4 xl:sticky xl:top-3">
-            <section className="rounded-[28px] border-2 border-line bg-white p-5 shadow-stamp">
+      <div className="mx-auto w-full max-w-[1600px] px-3 py-3 md:px-4 xl:px-5">
+        <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start">
+          <aside className="flex flex-col gap-3 xl:sticky xl:top-3">
+            <section className="rounded-lg border-2 border-line bg-white p-4 shadow-stamp">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs tracking-[0.22em] text-smoke">
+                  <p className="text-xs font-medium text-smoke">
                     {editingTodoId ? '编辑任务' : '新建任务'}
                   </p>
-                  <h1 className="mt-1 text-2xl font-bold text-ink">ToDo</h1>
+                  <h1 className="mt-1 text-xl font-bold text-ink">ToDo</h1>
                 </div>
                 {editingTodoId && (
                   <button
                     type="button"
                     onClick={resetForm}
-                    className="rounded-full border border-line px-3 py-2 text-xs font-medium text-ink transition hover:bg-paper"
+                    className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper"
                   >
                     取消
                   </button>
                 )}
               </div>
 
-              <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
+              <form className="mt-3 space-y-3" onSubmit={handleSubmit}>
                 <input
                   required
                   value={form.title}
@@ -576,92 +576,107 @@ export default function App() {
                     setForm((current) => ({ ...current, title: event.target.value }))
                   }
                   placeholder="任务标题"
-                  className="w-full rounded-[18px] border-2 border-line bg-paper px-4 py-3 text-base outline-none transition focus:bg-white"
+                  className="w-full rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-base outline-none transition focus:bg-white"
                 />
 
                 <textarea
-                  rows={4}
+                  rows={2}
                   value={form.notes}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, notes: event.target.value }))
                   }
                   placeholder="备注"
-                  className="w-full rounded-[18px] border-2 border-line bg-paper px-4 py-3 text-sm outline-none transition focus:bg-white"
+                  className="w-full resize-y rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
                 />
 
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                  <select
-                    value={form.priority}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        priority: event.target.value as Priority,
-                      }))
-                    }
-                    className="w-full rounded-[18px] border-2 border-line bg-paper px-4 py-3 text-sm outline-none transition focus:bg-white"
-                  >
-                    <option value="low">低优先级</option>
-                    <option value="medium">中优先级</option>
-                    <option value="high">高优先级</option>
-                  </select>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-smoke">优先级</span>
+                    <select
+                      value={form.priority}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          priority: event.target.value as Priority,
+                        }))
+                      }
+                      className="w-full rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
+                    >
+                      <option value="low">低优先级</option>
+                      <option value="medium">中优先级</option>
+                      <option value="high">高优先级</option>
+                    </select>
+                  </label>
 
-                  <input
-                    type="date"
-                    value={form.dueDate}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, dueDate: event.target.value }))
-                    }
-                    className="w-full rounded-[18px] border-2 border-line bg-paper px-4 py-3 text-sm outline-none transition focus:bg-white"
-                  />
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-smoke">
+                      DDL 最晚日期
+                    </span>
+                    <input
+                      type="date"
+                      value={form.dueDate}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, dueDate: event.target.value }))
+                      }
+                      className="w-full rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
+                    />
+                  </label>
                 </div>
 
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full rounded-[18px] border-2 border-line bg-clay px-4 py-3 text-sm font-bold tracking-[0.2em] text-white transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-lg border-2 border-line bg-clay px-4 py-2.5 text-sm font-bold text-white transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting ? '保存中...' : editingTodoId ? '保存修改' : '创建任务'}
                 </button>
               </form>
             </section>
 
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <StatCard label="总任务" value={data?.stats.total ?? 0} />
-              <StatCard label="待完成" value={data?.stats.open ?? 0} />
-              <StatCard label="已完成" value={data?.stats.done ?? 0} />
-              <StatCard label="高优先级" value={data?.stats.urgent ?? 0} />
+            <section className="rounded-lg border-2 border-line bg-[#fff8ef] p-3 shadow-stamp">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-sm font-bold text-ink">任务总览</h2>
+                <span className="text-xs text-smoke">{filterLabel}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <StatCard label="总任务" value={data?.stats.total ?? 0} />
+                <StatCard label="待完成" value={data?.stats.open ?? 0} />
+                <StatCard label="已完成" value={data?.stats.done ?? 0} />
+                <StatCard label="高优先级" value={data?.stats.urgent ?? 0} />
+              </div>
             </section>
           </aside>
 
-          <section className="rounded-[28px] border-2 border-line bg-[#f3eadb] p-4 shadow-stamp md:p-5">
-            <div className="flex flex-col gap-4 border-b-2 border-dashed border-line pb-4 xl:flex-row xl:items-center xl:justify-between">
+          <section className="rounded-lg border-2 border-line bg-[#f3eadb] p-3 shadow-stamp md:p-4">
+            <div className="flex flex-col gap-3 border-b-2 border-dashed border-line pb-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-3">
                 <FilterTabs value={filter} onChange={setFilter} />
-                <span className="rounded-full border border-dashed border-line px-3 py-2 text-xs text-smoke">
-                  列表区
+                <span className="rounded-md border border-dashed border-line px-3 py-1.5 text-xs text-smoke">
+                  {listCountLabel}
                 </span>
               </div>
 
               {(error || notice) && (
                 <div
                   className={[
-                    'rounded-[18px] border px-4 py-2 text-sm',
+                    'rounded-lg border px-3 py-2 text-sm',
                     error
                       ? 'border-clay bg-[#fff4ee] text-[#8a3f1f]'
                       : 'border-moss bg-[#f2f6ee] text-[#405131]',
                   ].join(' ')}
+                  aria-live="polite"
                 >
                   {error ?? notice}
                 </div>
               )}
             </div>
 
-            <div className="mt-5 space-y-6">
+            <div className="mt-4 space-y-5">
               {loading ? (
                 Array.from({ length: 3 }).map((_, index) => (
                   <div
                     key={index}
-                    className="h-36 animate-pulse rounded-[24px] border-2 border-line bg-white/80"
+                    className="h-24 animate-pulse rounded-lg border-2 border-line bg-white/80"
                   />
                 ))
               ) : timeline.length > 0 ? (
@@ -680,30 +695,30 @@ export default function App() {
                   />
                 ))
               ) : filter === 'done' ? null : (
-                <div className="rounded-[24px] border-2 border-dashed border-line bg-white px-6 py-12 text-center">
+                <div className="rounded-lg border-2 border-dashed border-line bg-white px-6 py-10 text-center">
                   <p className="text-sm text-smoke">当前没有待完成任务</p>
                 </div>
               )}
 
               {visibleDoneTodos.length > 0 && (
-                <section className="rounded-[24px] border-2 border-line bg-[#edf2e6] p-4 md:p-5">
+                <section className="rounded-lg border-2 border-line bg-[#edf2e6] p-3 md:p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
-                      <h2 className="text-lg font-bold text-ink">已完成</h2>
+                      <h2 className="text-base font-bold text-ink">已完成</h2>
                       <span className="text-sm text-smoke">{visibleDoneTodos.length}</span>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => setCompletedExpanded((current) => !current)}
-                      className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper"
+                      className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper"
                     >
                       {completedExpanded ? '收起' : '展开'}
                     </button>
                   </div>
 
                   {completedExpanded && (
-                    <div className="mt-4 grid gap-4 2xl:grid-cols-2">
+                    <div className="mt-3 grid gap-3 2xl:grid-cols-2">
                       {visibleDoneTodos.map((todo) => (
                         <TodoItem
                           key={todo.id}

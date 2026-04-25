@@ -41,7 +41,7 @@ export interface CreateTodoInput {
   title: string
   notes: string
   priority: Priority
-  dueDate: string
+  dueDate?: string
 }
 
 export interface UpdateTodoInput {
