@@ -718,8 +718,8 @@ export default function App() {
   return (
     <main className="min-h-screen bg-paper text-ink">
       <div className="mx-auto w-full max-w-[1600px] px-3 py-3 md:px-4 xl:px-5">
-        <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start">
-          <aside className="flex flex-col gap-3 xl:sticky xl:top-3">
+        <div className="grid gap-3 2xl:grid-cols-[280px_minmax(0,1fr)] 2xl:items-start">
+          <aside className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start 2xl:sticky 2xl:top-3 2xl:flex 2xl:flex-col">
             <section className="rounded-lg border-2 border-line bg-white p-4 shadow-stamp">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -760,7 +760,7 @@ export default function App() {
                   className="w-full resize-y rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
                 />
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
                   <div className="block">
                     <span className="mb-1 block text-xs font-medium text-smoke">标签配置</span>
                     <div className="flex gap-2">
@@ -823,7 +823,7 @@ export default function App() {
                 </div>
 
                 <div className="rounded-lg border-2 border-dashed border-line bg-paper p-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:flex-col xl:items-stretch 2xl:flex-row 2xl:items-center">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between 2xl:flex-col 2xl:items-stretch">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-smoke">附件</p>
                       <p className="mt-1 truncate text-sm text-ink">
@@ -912,6 +912,13 @@ export default function App() {
             </div>
 
             <div className="mt-4 space-y-5">
+              {doneTodos.length > 0 && (
+                <CompletedGroupTrigger
+                  count={doneTodos.length}
+                  onOpen={() => setCompletedModalOpen(true)}
+                />
+              )}
+
               {loading ? (
                 Array.from({ length: 3 }).map((_, index) => (
                   <div
@@ -940,13 +947,6 @@ export default function App() {
                 <div className="rounded-lg border-2 border-dashed border-line bg-white px-6 py-10 text-center">
                   <p className="text-sm text-smoke">当前没有待完成任务</p>
                 </div>
-              )}
-
-              {doneTodos.length > 0 && (
-                <CompletedGroupTrigger
-                  count={doneTodos.length}
-                  onOpen={() => setCompletedModalOpen(true)}
-                />
               )}
             </div>
           </section>
