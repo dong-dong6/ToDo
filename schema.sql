@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS todos (
   title TEXT NOT NULL,
   notes TEXT NOT NULL DEFAULT '',
   priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
+  tags TEXT NOT NULL DEFAULT '[]',
   completed INTEGER NOT NULL DEFAULT 0,
   due_date TEXT,
   created_at TEXT NOT NULL,

@@ -12,6 +12,7 @@ interface TodoRow {
   title: string
   notes: string
   priority: Priority
+  tags: string
   completed: number
   due_date: string | null
   created_at: string
@@ -42,6 +43,7 @@ interface CreateTodoBody {
   title?: string
   notes?: string
   priority?: Priority
+  tags?: string[]
   dueDate?: string
 }
 
@@ -49,6 +51,7 @@ interface UpdateTodoBody {
   title?: string
   notes?: string
   priority?: Priority
+  tags?: string[]
   dueDate?: string
   completed?: boolean
 }
@@ -181,6 +184,47 @@ function isPriority(value: unknown): value is Priority {
   return value === 'low' || value === 'medium' || value === 'high'
 }
 
+function sanitizeTags(value: unknown) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const tags = new Set<string>()
+  for (const item of value) {
+    if (typeof item !== 'string') {
+      continue
+    }
+
+    const tag = item.trim().slice(0, 24)
+    if (tag) {
+      tags.add(tag)
+    }
+  }
+
+  return Array.from(tags).slice(0, 6)
+}
+
+function parseTags(value: string | null) {
+  if (!value) {
+    return []
+  }
+
+  try {
+    return sanitizeTags(JSON.parse(value))
+  } catch {
+    return []
+  }
+}
+
+async function ensureTodoTagsColumn(env: Env) {
+  const { results } = await env.TODO_DB.prepare('PRAGMA table_info(todos)').all<{ name: string }>()
+  const hasTags = results.some((column) => column.name === 'tags')
+
+  if (!hasTags) {
+    await env.TODO_DB.prepare("ALTER TABLE todos ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'").run()
+  }
+}
+
 function mapAttachment(row: AttachmentRow) {
   return {
     id: row.id,
@@ -200,6 +244,7 @@ function buildTodo(row: TodoWithAttachmentRow) {
     title: row.title,
     notes: row.notes,
     priority: row.priority,
+    tags: parseTags(row.tags),
     completed: Boolean(row.completed),
     dueDate: row.due_date,
     createdAt: row.created_at,
@@ -219,8 +264,10 @@ async function readRequestJson<T>(request: Request): Promise<T | null> {
 }
 
 async function getTodoById(env: Env, id: string) {
+  await ensureTodoTagsColumn(env)
+
   return env.TODO_DB.prepare(
-    `SELECT id, title, notes, priority, completed, due_date, created_at, updated_at, completed_at
+    `SELECT id, title, notes, priority, tags, completed, due_date, created_at, updated_at, completed_at
      FROM todos
      WHERE id = ?1`,
   )
@@ -239,30 +286,35 @@ async function getAttachmentById(env: Env, id: string) {
 }
 
 async function getStats(env: Env) {
+  await ensureTodoTagsColumn(env)
+
   const counts = await env.TODO_DB.prepare(
     `SELECT
       COUNT(*) AS total,
       SUM(CASE WHEN completed = 0 THEN 1 ELSE 0 END) AS open,
       SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS done,
-      SUM(CASE WHEN priority = 'high' AND completed = 0 THEN 1 ELSE 0 END) AS urgent
+      SUM(CASE WHEN tags != '[]' AND completed = 0 THEN 1 ELSE 0 END) AS tagged
      FROM todos`,
-  ).first<{ total: number; open: number | null; done: number | null; urgent: number | null }>()
+  ).first<{ total: number; open: number | null; done: number | null; tagged: number | null }>()
 
   return {
     total: counts?.total ?? 0,
     open: counts?.open ?? 0,
     done: counts?.done ?? 0,
-    urgent: counts?.urgent ?? 0,
+    tagged: counts?.tagged ?? 0,
   }
 }
 
 async function listTodos(env: Env) {
+  await ensureTodoTagsColumn(env)
+
   const { results } = await env.TODO_DB.prepare(
     `SELECT
         t.id,
         t.title,
         t.notes,
         t.priority,
+        t.tags,
         t.completed,
         t.due_date,
         t.created_at,
@@ -311,6 +363,8 @@ async function listTodos(env: Env) {
 }
 
 async function createTodo(request: Request, env: Env) {
+  await ensureTodoTagsColumn(env)
+
   const body = await readRequestJson<CreateTodoBody>(request)
   const title = body?.title?.trim()
 
@@ -327,12 +381,14 @@ async function createTodo(request: Request, env: Env) {
   const id = crypto.randomUUID()
   const dueDate = body?.dueDate?.trim() ? body.dueDate : null
   const notes = body?.notes?.trim() ?? ''
+  const tags = sanitizeTags(body?.tags)
+  const tagsJson = JSON.stringify(tags)
 
   await env.TODO_DB.prepare(
-    `INSERT INTO todos (id, title, notes, priority, completed, due_date, created_at, updated_at, completed_at)
-     VALUES (?1, ?2, ?3, ?4, 0, ?5, ?6, ?6, NULL)`,
+    `INSERT INTO todos (id, title, notes, priority, tags, completed, due_date, created_at, updated_at, completed_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?7, NULL)`,
   )
-    .bind(id, title, notes, priority, dueDate, now)
+    .bind(id, title, notes, priority, tagsJson, dueDate, now)
     .run()
 
   return json(
@@ -341,6 +397,7 @@ async function createTodo(request: Request, env: Env) {
       title,
       notes,
       priority,
+      tags,
       completed: false,
       dueDate,
       createdAt: now,
@@ -369,6 +426,7 @@ async function updateTodo(request: Request, env: Env, id: string) {
     (body.title !== undefined ||
       body.notes !== undefined ||
       body.priority !== undefined ||
+      body.tags !== undefined ||
       body.dueDate !== undefined) &&
     body.completed !== false
   ) {
@@ -385,6 +443,8 @@ async function updateTodo(request: Request, env: Env, id: string) {
     return error('Invalid priority value', 422)
   }
 
+  const tags = body.tags === undefined ? parseTags(existing.tags) : sanitizeTags(body.tags)
+  const tagsJson = JSON.stringify(tags)
   const dueDate =
     body.dueDate === undefined ? existing.due_date : body.dueDate.trim() ? body.dueDate : null
   const completed = body.completed === undefined ? Boolean(existing.completed) : body.completed
@@ -397,13 +457,14 @@ async function updateTodo(request: Request, env: Env, id: string) {
      SET title = ?2,
          notes = ?3,
          priority = ?4,
-         completed = ?5,
-         due_date = ?6,
-         updated_at = ?7,
-         completed_at = ?8
+         tags = ?5,
+         completed = ?6,
+         due_date = ?7,
+         updated_at = ?8,
+         completed_at = ?9
      WHERE id = ?1`,
   )
-    .bind(id, title, notes, priority, completed ? 1 : 0, dueDate, updatedAt, completedAt)
+    .bind(id, title, notes, priority, tagsJson, completed ? 1 : 0, dueDate, updatedAt, completedAt)
     .run()
 
   const todo = await getTodoById(env, id)
@@ -416,6 +477,7 @@ async function updateTodo(request: Request, env: Env, id: string) {
     title: todo.title,
     notes: todo.notes,
     priority: todo.priority,
+    tags: parseTags(todo.tags),
     completed: Boolean(todo.completed),
     dueDate: todo.due_date,
     createdAt: todo.created_at,

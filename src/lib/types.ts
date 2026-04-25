@@ -1,6 +1,3 @@
-export type Priority = 'low' | 'medium' | 'high'
-export type TodoFilter = 'all' | 'open' | 'done'
-
 export interface TodoAttachment {
   id: string
   todoId: string
@@ -16,7 +13,7 @@ export interface Todo {
   id: string
   title: string
   notes: string
-  priority: Priority
+  tags: string[]
   completed: boolean
   dueDate: string | null
   createdAt: string
@@ -29,7 +26,7 @@ export interface TodoStats {
   total: number
   open: number
   done: number
-  urgent: number
+  tagged: number
 }
 
 export interface TodoResponse {
@@ -40,14 +37,14 @@ export interface TodoResponse {
 export interface CreateTodoInput {
   title: string
   notes: string
-  priority: Priority
+  tags: string[]
   dueDate?: string
 }
 
 export interface UpdateTodoInput {
   title?: string
   notes?: string
-  priority?: Priority
+  tags?: string[]
   dueDate?: string
   completed?: boolean
 }

@@ -1,19 +1,21 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createTodo, deleteAttachment, deleteTodo, getTodos, updateTodo, uploadAttachment } from './lib/api'
-import type { Priority, Todo, TodoAttachment, TodoFilter, TodoResponse } from './lib/types'
+import type { Todo, TodoAttachment, TodoResponse } from './lib/types'
 
 const initialForm = {
   title: '',
   notes: '',
-  priority: 'medium' as Priority,
+  tagInput: '',
+  tags: [] as string[],
   dueDate: '',
 }
 
-const priorityTone: Record<Priority, string> = {
-  low: 'bg-white/80 text-ink',
-  medium: 'bg-sand text-ink',
-  high: 'bg-clay text-white',
-}
+const tagTones = [
+  'bg-sand text-ink',
+  'bg-[#edf2e6] text-[#405131]',
+  'bg-[#fff4ee] text-[#8a3f1f]',
+  'bg-white/80 text-ink',
+]
 
 function toLocalDateKey(value: string | Date) {
   const date = typeof value === 'string' ? new Date(value) : value
@@ -87,6 +89,14 @@ function formatSelectedFiles(files: File[]) {
   return `${files.length} 个附件`
 }
 
+function normalizeTag(value: string) {
+  return value.trim().slice(0, 24)
+}
+
+function tagTone(index: number) {
+  return tagTones[index % tagTones.length]
+}
+
 function buildTimeline(todos: Todo[]) {
   const groups = new Map<string, Todo[]>()
 
@@ -102,14 +112,7 @@ function buildTimeline(todos: Todo[]) {
     .map(([key, items]) => ({
       key,
       label: formatTaskDateLabel(key),
-      items: items.sort((left, right) => {
-        if (left.priority !== right.priority) {
-          const rank = { high: 0, medium: 1, low: 2 }
-          return rank[left.priority] - rank[right.priority]
-        }
-
-        return right.createdAt.localeCompare(left.createdAt)
-      }),
+      items: items.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
     }))
 }
 
@@ -118,32 +121,6 @@ function StatCard(props: { label: string; value: number }) {
     <div className="rounded-lg border border-line bg-white px-3 py-2">
       <p className="text-[11px] font-medium text-smoke">{props.label}</p>
       <p className="mt-1 text-xl font-bold leading-none text-ink">{props.value}</p>
-    </div>
-  )
-}
-
-function FilterTabs(props: { value: TodoFilter; onChange: (value: TodoFilter) => void }) {
-  const items: Array<{ value: TodoFilter; label: string }> = [
-    { value: 'all', label: '全部' },
-    { value: 'open', label: '待完成' },
-    { value: 'done', label: '已完成' },
-  ]
-
-  return (
-    <div className="inline-flex flex-wrap rounded-lg border border-line bg-white p-1">
-      {items.map((item) => (
-        <button
-          key={item.value}
-          type="button"
-          onClick={() => props.onChange(item.value)}
-          className={[
-            'rounded-md px-3 py-1.5 text-sm font-medium transition',
-            props.value === item.value ? 'bg-ink text-paper' : 'text-smoke hover:text-ink',
-          ].join(' ')}
-        >
-          {item.label}
-        </button>
-      ))}
     </div>
   )
 }
@@ -230,18 +207,17 @@ function TodoItem(props: {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-base font-semibold leading-6 text-ink">{props.todo.title}</h3>
-                <span
-                  className={[
-                    'rounded-md px-2 py-1 text-[11px] font-semibold',
-                    priorityTone[props.todo.priority],
-                  ].join(' ')}
-                >
-                  {props.todo.priority === 'high'
-                    ? '高'
-                    : props.todo.priority === 'medium'
-                      ? '中'
-                      : '低'}
-                </span>
+                {props.todo.tags.map((tag, index) => (
+                  <span
+                    key={tag}
+                    className={[
+                      'rounded-md px-2 py-1 text-[11px] font-semibold',
+                      tagTone(index),
+                    ].join(' ')}
+                  >
+                    {tag}
+                  </span>
+                ))}
                 {deadlineLabel && (
                   <span className="rounded-md border border-dashed border-line px-2 py-1 text-[11px] text-smoke">
                     DDL {deadlineLabel}
@@ -311,8 +287,10 @@ function TodoItem(props: {
 function TimelineGroup(props: {
   label: string
   items: Todo[]
+  collapsed: boolean
   busyId: string | null
   uploadingId: string | null
+  onToggleGroup: () => void
   onToggle: (todo: Todo) => Promise<void>
   onEdit: (todo: Todo) => void
   onDelete: (id: string) => Promise<void>
@@ -320,37 +298,136 @@ function TimelineGroup(props: {
   onDeleteAttachment: (todo: Todo, attachment: TodoAttachment) => Promise<void>
 }) {
   return (
-    <section className="grid gap-3 xl:grid-cols-[104px_1fr] xl:gap-4">
-      <div className="xl:sticky xl:top-5 xl:self-start">
-        <div className="rounded-lg border-2 border-line bg-[#fff8ef] px-3 py-3">
+    <section className="rounded-lg border-2 border-line bg-[#fff8ef] shadow-stamp">
+      <button
+        type="button"
+        onClick={props.onToggleGroup}
+        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition hover:bg-white/50"
+      >
+        <div>
           <p className="text-[11px] font-medium text-smoke">任务日期</p>
-          <h3 className="mt-1 text-sm font-bold leading-5 text-ink">{props.label}</h3>
-          <p className="mt-1 text-xs text-smoke">{props.items.length} 项</p>
+          <h3 className="mt-1 text-base font-bold leading-5 text-ink">{props.label}</h3>
+        </div>
+        <span className="shrink-0 rounded-md border border-line bg-white px-3 py-1.5 text-xs text-smoke">
+          {props.collapsed ? '展开' : '收起'} · {props.items.length} 项
+        </span>
+      </button>
+
+      {!props.collapsed && (
+        <div className="space-y-3 border-t-2 border-dashed border-line p-3">
+          {props.items.map((todo) => (
+            <TodoItem
+              key={todo.id}
+              todo={todo}
+              busy={props.busyId === todo.id}
+              uploading={props.uploadingId === todo.id}
+              onToggle={props.onToggle}
+              onEdit={props.onEdit}
+              onDelete={props.onDelete}
+              onUpload={props.onUpload}
+              onDeleteAttachment={props.onDeleteAttachment}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function CompletedTaskModal(props: {
+  todos: Todo[]
+  dateValue: string
+  searchValue: string
+  busyId: string | null
+  uploadingId: string | null
+  onDateChange: (value: string) => void
+  onSearchChange: (value: string) => void
+  onClose: () => void
+  onToggle: (todo: Todo) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+  onUpload: (todo: Todo, event: ChangeEvent<HTMLInputElement>) => Promise<void>
+  onDeleteAttachment: (todo: Todo, attachment: TodoAttachment) => Promise<void>
+}) {
+  const dateOptions = Array.from(
+    new Set(props.todos.map((todo) => toLocalDateKey(todo.completedAt ?? todo.updatedAt))),
+  ).sort((left, right) => right.localeCompare(left))
+  const search = props.searchValue.trim().toLowerCase()
+  const visibleTodos = props.todos.filter((todo) => {
+    const dateKey = toLocalDateKey(todo.completedAt ?? todo.updatedAt)
+    const matchesDate = props.dateValue === '' || props.dateValue === dateKey
+    const text = [todo.title, todo.notes, ...todo.tags].join(' ').toLowerCase()
+
+    return matchesDate && (!search || text.includes(search))
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 bg-ink/40 px-3 py-6">
+      <div className="mx-auto flex max-h-full w-full max-w-4xl flex-col rounded-lg border-2 border-line bg-paper shadow-stamp">
+        <div className="flex flex-col gap-3 border-b-2 border-dashed border-line p-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-medium text-smoke">已完成任务</p>
+            <h2 className="mt-1 text-xl font-bold text-ink">{visibleTodos.length} 项</h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={props.onClose}
+            className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper"
+          >
+            关闭
+          </button>
+        </div>
+
+        <div className="grid gap-3 border-b-2 border-dashed border-line p-4 md:grid-cols-[180px_1fr]">
+          <select
+            value={props.dateValue}
+            onChange={(event) => props.onDateChange(event.target.value)}
+            className="w-full rounded-lg border-2 border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:bg-paper"
+          >
+            <option value="">全部日期</option>
+            {dateOptions.map((date) => (
+              <option key={date} value={date}>
+                {formatTaskDateLabel(date)}
+              </option>
+            ))}
+          </select>
+
+          <input
+            value={props.searchValue}
+            onChange={(event) => props.onSearchChange(event.target.value)}
+            placeholder="搜索任务内容或标签"
+            className="w-full rounded-lg border-2 border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:bg-paper"
+          />
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+          {visibleTodos.length > 0 ? (
+            visibleTodos.map((todo) => (
+              <TodoItem
+                key={todo.id}
+                todo={todo}
+                busy={props.busyId === todo.id}
+                compact
+                uploading={props.uploadingId === todo.id}
+                onToggle={props.onToggle}
+                onDelete={props.onDelete}
+                onUpload={props.onUpload}
+                onDeleteAttachment={props.onDeleteAttachment}
+              />
+            ))
+          ) : (
+            <div className="rounded-lg border-2 border-dashed border-line bg-white px-6 py-10 text-center">
+              <p className="text-sm text-smoke">没有匹配的已完成任务</p>
+            </div>
+          )}
         </div>
       </div>
-
-      <div className="space-y-3">
-        {props.items.map((todo) => (
-          <TodoItem
-            key={todo.id}
-            todo={todo}
-            busy={props.busyId === todo.id}
-            uploading={props.uploadingId === todo.id}
-            onToggle={props.onToggle}
-            onEdit={props.onEdit}
-            onDelete={props.onDelete}
-            onUpload={props.onUpload}
-            onDeleteAttachment={props.onDeleteAttachment}
-          />
-        ))}
-      </div>
-    </section>
+    </div>
   )
 }
 
 export default function App() {
   const [data, setData] = useState<TodoResponse | null>(null)
-  const [filter, setFilter] = useState<TodoFilter>('all')
   const [form, setForm] = useState(initialForm)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -358,9 +435,12 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [completedExpanded, setCompletedExpanded] = useState(false)
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
   const [formFiles, setFormFiles] = useState<File[]>([])
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set())
+  const [completedModalOpen, setCompletedModalOpen] = useState(false)
+  const [completedDate, setCompletedDate] = useState('')
+  const [completedSearch, setCompletedSearch] = useState('')
   const formFileInputRef = useRef<HTMLInputElement>(null)
 
   function resetForm() {
@@ -400,26 +480,19 @@ export default function App() {
     [data],
   )
 
-  const visibleOpenTodos = useMemo(() => {
-    if (filter === 'done') {
-      return []
-    }
+  const timeline = useMemo(() => buildTimeline(openTodos), [openTodos])
 
-    return openTodos
-  }, [filter, openTodos])
-
-  const visibleDoneTodos = useMemo(() => {
-    if (filter === 'open') {
-      return []
-    }
-
-    return doneTodos
-  }, [filter, doneTodos])
-
-  const timeline = useMemo(() => buildTimeline(visibleOpenTodos), [visibleOpenTodos])
-  const filterLabel = filter === 'all' ? '全部' : filter === 'open' ? '待完成' : '已完成'
-  const listCountLabel =
-    filter === 'done' ? `${visibleDoneTodos.length} 项已完成` : `${visibleOpenTodos.length} 项待办`
+  function toggleDateGroup(dateKey: string) {
+    setCollapsedDates((current) => {
+      const next = new Set(current)
+      if (next.has(dateKey)) {
+        next.delete(dateKey)
+      } else {
+        next.add(dateKey)
+      }
+      return next
+    })
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -441,14 +514,14 @@ export default function App() {
         savedTodo = await updateTodo(editingTodoId, {
           title: form.title.trim(),
           notes: form.notes.trim(),
-          priority: form.priority,
+          tags: form.tags,
           dueDate: form.dueDate,
         })
       } else {
         savedTodo = await createTodo({
           title: form.title.trim(),
           notes: form.notes.trim(),
-          priority: form.priority,
+          tags: form.tags,
           dueDate: form.dueDate,
         })
       }
@@ -494,7 +567,8 @@ export default function App() {
     setForm({
       title: todo.title,
       notes: todo.notes,
-      priority: todo.priority,
+      tagInput: '',
+      tags: todo.tags,
       dueDate: todo.dueDate ?? '',
     })
     setFormFiles([])
@@ -514,6 +588,32 @@ export default function App() {
     if (formFileInputRef.current) {
       formFileInputRef.current.value = ''
     }
+  }
+
+  function addFormTag() {
+    const tag = normalizeTag(form.tagInput)
+    if (!tag) {
+      return
+    }
+
+    setForm((current) => {
+      if (current.tags.includes(tag) || current.tags.length >= 6) {
+        return { ...current, tagInput: '' }
+      }
+
+      return {
+        ...current,
+        tagInput: '',
+        tags: [...current.tags, tag],
+      }
+    })
+  }
+
+  function removeFormTag(tag: string) {
+    setForm((current) => ({
+      ...current,
+      tags: current.tags.filter((item) => item !== tag),
+    }))
   }
 
   async function handleToggle(todo: Todo) {
@@ -641,23 +741,51 @@ export default function App() {
                 />
 
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-medium text-smoke">优先级</span>
-                    <select
-                      value={form.priority}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          priority: event.target.value as Priority,
-                        }))
-                      }
-                      className="w-full rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
-                    >
-                      <option value="low">低优先级</option>
-                      <option value="medium">中优先级</option>
-                      <option value="high">高优先级</option>
-                    </select>
-                  </label>
+                  <div className="block">
+                    <span className="mb-1 block text-xs font-medium text-smoke">标签配置</span>
+                    <div className="flex gap-2">
+                      <input
+                        value={form.tagInput}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, tagInput: event.target.value }))
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            addFormTag()
+                          }
+                        }}
+                        placeholder="输入标签"
+                        className="min-w-0 flex-1 rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
+                      />
+                      <button
+                        type="button"
+                        disabled={form.tags.length >= 6}
+                        onClick={addFormTag}
+                        className="rounded-lg border-2 border-line bg-white px-3 py-2 text-sm font-medium text-ink transition hover:bg-sand disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        添加
+                      </button>
+                    </div>
+
+                    {form.tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {form.tags.map((tag, index) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => removeFormTag(tag)}
+                            className={[
+                              'rounded-md px-2 py-1 text-[11px] font-semibold transition hover:opacity-75',
+                              tagTone(index),
+                            ].join(' ')}
+                          >
+                            {tag} x
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   <label className="block">
                     <span className="mb-1 block text-xs font-medium text-smoke">
@@ -729,13 +857,13 @@ export default function App() {
             <section className="rounded-lg border-2 border-line bg-[#fff8ef] p-3 shadow-stamp">
               <div className="mb-2 flex items-center justify-between">
                 <h2 className="text-sm font-bold text-ink">任务总览</h2>
-                <span className="text-xs text-smoke">{filterLabel}</span>
+                <span className="text-xs text-smoke">按日期</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <StatCard label="总任务" value={data?.stats.total ?? 0} />
                 <StatCard label="待完成" value={data?.stats.open ?? 0} />
                 <StatCard label="已完成" value={data?.stats.done ?? 0} />
-                <StatCard label="高优先级" value={data?.stats.urgent ?? 0} />
+                <StatCard label="有标签" value={data?.stats.tagged ?? 0} />
               </div>
             </section>
           </aside>
@@ -743,10 +871,18 @@ export default function App() {
           <section className="rounded-lg border-2 border-line bg-[#f3eadb] p-3 shadow-stamp md:p-4">
             <div className="flex flex-col gap-3 border-b-2 border-dashed border-line pb-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-3">
-                <FilterTabs value={filter} onChange={setFilter} />
                 <span className="rounded-md border border-dashed border-line px-3 py-1.5 text-xs text-smoke">
-                  {listCountLabel}
+                  {openTodos.length} 项待办
                 </span>
+                {doneTodos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setCompletedModalOpen(true)}
+                    className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper"
+                  >
+                    已完成 {doneTodos.length}
+                  </button>
+                )}
               </div>
 
               {(error || notice) && (
@@ -778,8 +914,10 @@ export default function App() {
                     key={group.key}
                     label={group.label}
                     items={group.items}
+                    collapsed={collapsedDates.has(group.key)}
                     busyId={busyId}
                     uploadingId={uploadingId}
+                    onToggleGroup={() => toggleDateGroup(group.key)}
                     onToggle={handleToggle}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
@@ -787,52 +925,32 @@ export default function App() {
                     onDeleteAttachment={handleDeleteAttachment}
                   />
                 ))
-              ) : filter === 'done' ? null : (
+              ) : (
                 <div className="rounded-lg border-2 border-dashed border-line bg-white px-6 py-10 text-center">
                   <p className="text-sm text-smoke">当前没有待完成任务</p>
                 </div>
-              )}
-
-              {visibleDoneTodos.length > 0 && (
-                <section className="rounded-lg border-2 border-line bg-[#edf2e6] p-3 md:p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-base font-bold text-ink">已完成</h2>
-                      <span className="text-sm text-smoke">{visibleDoneTodos.length}</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setCompletedExpanded((current) => !current)}
-                      className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper"
-                    >
-                      {completedExpanded ? '收起' : '展开'}
-                    </button>
-                  </div>
-
-                  {completedExpanded && (
-                    <div className="mt-3 grid gap-3 2xl:grid-cols-2">
-                      {visibleDoneTodos.map((todo) => (
-                        <TodoItem
-                          key={todo.id}
-                          todo={todo}
-                          busy={busyId === todo.id}
-                          compact
-                          uploading={false}
-                          onToggle={handleToggle}
-                          onDelete={handleDelete}
-                          onUpload={handleUpload}
-                          onDeleteAttachment={handleDeleteAttachment}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </section>
               )}
             </div>
           </section>
         </div>
       </div>
+
+      {completedModalOpen && (
+        <CompletedTaskModal
+          todos={doneTodos}
+          dateValue={completedDate}
+          searchValue={completedSearch}
+          busyId={busyId}
+          uploadingId={uploadingId}
+          onDateChange={setCompletedDate}
+          onSearchChange={setCompletedSearch}
+          onClose={() => setCompletedModalOpen(false)}
+          onToggle={handleToggle}
+          onDelete={handleDelete}
+          onUpload={handleUpload}
+          onDeleteAttachment={handleDeleteAttachment}
+        />
+      )}
     </main>
   )
 }
