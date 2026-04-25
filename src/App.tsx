@@ -118,7 +118,7 @@ function buildTimeline(todos: Todo[]) {
 
 function StatCard(props: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-line bg-white px-3 py-2">
+    <div className="stat-item">
       <p className="text-[11px] font-medium text-smoke">{props.label}</p>
       <p className="mt-1 text-xl font-bold leading-none text-ink">{props.value}</p>
     </div>
@@ -721,7 +721,7 @@ export default function App() {
         <section className="control-panel">
           <section className="control-card workspace-panel bg-white">
             <div className="workspace-top">
-              <div className="new-task-card">
+              <div className="workspace-head">
                 <div className="new-task-header flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-medium text-smoke">
@@ -740,10 +740,21 @@ export default function App() {
                   )}
                 </div>
 
-                <form
-                  className="new-task-form mt-3 space-y-3 landscape:space-y-2"
-                  onSubmit={handleSubmit}
-                >
+                <div className="overview-inline" aria-label="任务总览">
+                  <div className="overview-inline-title">
+                    <h2 className="text-sm font-bold text-ink">任务总览</h2>
+                    <span className="text-[11px] text-smoke">按日期</span>
+                  </div>
+                  <div className="stats-grid">
+                    <StatCard label="总任务" value={data?.stats.total ?? 0} />
+                    <StatCard label="待完成" value={data?.stats.open ?? 0} />
+                    <StatCard label="已完成" value={data?.stats.done ?? 0} />
+                    <StatCard label="有标签" value={data?.stats.tagged ?? 0} />
+                  </div>
+                </div>
+              </div>
+
+              <form className="new-task-form" onSubmit={handleSubmit}>
                 <input
                   required
                   value={form.title}
@@ -877,21 +888,7 @@ export default function App() {
                         : '创建任务'}
                   </button>
                 </div>
-                </form>
-              </div>
-
-              <aside className="overview-panel">
-                <div className="overview-header">
-                  <h2 className="text-xl font-bold text-ink">任务总览</h2>
-                  <span className="text-xs text-smoke">按日期</span>
-                </div>
-                <div className="stats-grid">
-                  <StatCard label="总任务" value={data?.stats.total ?? 0} />
-                  <StatCard label="待完成" value={data?.stats.open ?? 0} />
-                  <StatCard label="已完成" value={data?.stats.done ?? 0} />
-                  <StatCard label="有标签" value={data?.stats.tagged ?? 0} />
-                </div>
-              </aside>
+              </form>
             </div>
           </section>
         </section>

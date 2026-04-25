@@ -57,23 +57,26 @@ body {
 
 .workspace-top {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
-.overview-panel {
-  border: 1px solid #1f1a16;
-  border-radius: 8px;
-  background: #fffaf4;
-  padding: 12px;
-  box-shadow: 4px 4px 0 0 rgba(23, 23, 23, 0.08);
+.workspace-head {
+  display: grid;
+  gap: 12px;
+  border-bottom: 2px dashed #1f1a16;
+  padding-bottom: 12px;
 }
 
-.overview-header {
+.overview-inline {
+  display: grid;
+  gap: 8px;
+}
+
+.overview-inline-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
 }
 
 .task-panel {
@@ -92,7 +95,16 @@ body {
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  border-top: 1px solid #1f1a16;
+  border-left: 1px solid #1f1a16;
+}
+
+.stat-item {
+  min-width: 0;
+  border-right: 1px solid #1f1a16;
+  border-bottom: 1px solid #1f1a16;
+  background: #fffaf4;
+  padding: 9px 10px;
 }
 
 .shadow-soft {
@@ -118,9 +130,18 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .workspace-top {
-    grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.9fr);
-    align-items: start;
+  .workspace-head {
+    grid-template-columns: minmax(140px, 0.45fr) minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .overview-inline {
+    border-left: 2px dashed #1f1a16;
+    padding-left: 14px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -138,8 +159,17 @@ body {
     overflow: auto;
   }
 
-  .workspace-top {
+  .workspace-head {
     grid-template-columns: 1fr;
+  }
+
+  .overview-inline {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .task-panel {
@@ -164,10 +194,6 @@ body {
 
   .control-panel {
     gap: 14px;
-  }
-
-  .workspace-top {
-    grid-template-columns: minmax(0, 1.28fr) minmax(260px, 0.82fr);
   }
 
   .new-task-card {
@@ -238,9 +264,8 @@ body {
     padding: 12px;
   }
 
-  .workspace-top {
-    grid-template-columns: minmax(0, 1.22fr) minmax(230px, 0.78fr);
-    gap: 12px;
+  .workspace-head {
+    grid-template-columns: minmax(140px, 0.38fr) minmax(0, 1fr);
   }
 
   .new-task-card {
