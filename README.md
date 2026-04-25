@@ -3,8 +3,8 @@
 一个可直接部署到 Cloudflare 的 ToDo 列表项目：
 
 - 前端：Vite + React + Tailwind
-- 托管：Cloudflare Pages
-- API：Cloudflare Pages Functions
+- 托管：Cloudflare Workers Static Assets
+- API：Cloudflare Workers
 - 数据库：Cloudflare D1
 - 附件存储：Cloudflare R2
 
@@ -17,10 +17,9 @@ npm install
 npm run dev
 ```
 
-如果要连同 Cloudflare Functions 一起本地预览：
+如果要连同 Cloudflare Worker API 一起本地预览：
 
 ```bash
-npm run build
 npm run cf:dev
 ```
 
@@ -52,12 +51,12 @@ npx wrangler r2 bucket create todo-snapshots
 npm run deploy
 ```
 
-更常见的做法是把仓库接到 Cloudflare Pages，然后配置：
+在 Cloudflare Workers 中连接仓库时，配置：
 
 - Build command: `npm run build`
-- Build output directory: `dist`
+- Deploy command: `npm run deploy`
 
-Pages 会自动识别 `functions/` 目录下的 API。
+Worker 入口是 [worker/index.ts](/root/dev/ToDo/worker/index.ts)，静态资源由 [wrangler.toml](/root/dev/ToDo/wrangler.toml) 中的 `[assets]` 配置从 `dist` 发布。
 
 ## API 概览
 
