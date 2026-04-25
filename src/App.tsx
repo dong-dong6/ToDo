@@ -717,9 +717,9 @@ export default function App() {
 
   return (
     <main className="min-h-screen bg-paper text-ink">
-      <div className="mx-auto w-full max-w-[1600px] px-3 py-3 md:px-4 xl:px-5">
-        <div className="grid gap-3 2xl:grid-cols-[minmax(360px,28vw)_minmax(0,1fr)] 2xl:items-start">
-          <aside className="grid gap-3 lg:grid-cols-2 lg:items-start 2xl:sticky 2xl:top-3 2xl:flex 2xl:flex-col">
+      <div className="mx-auto grid w-full max-w-[1680px] gap-4 px-3 py-3 md:px-4 xl:px-5">
+        <section className="grid gap-3 lg:grid-cols-2 lg:items-start">
+          <div className="min-w-0">
             <section className="rounded-lg border-2 border-line bg-white p-4 shadow-stamp">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -760,7 +760,7 @@ export default function App() {
                   className="w-full resize-y rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
                 />
 
-                <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div className="block">
                     <span className="mb-1 block text-xs font-medium text-smoke">标签配置</span>
                     <div className="flex gap-2">
@@ -823,7 +823,7 @@ export default function App() {
                 </div>
 
                 <div className="rounded-lg border-2 border-dashed border-line bg-paper p-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between 2xl:flex-col 2xl:items-stretch">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-smoke">附件</p>
                       <p className="mt-1 truncate text-sm text-ink">
@@ -873,84 +873,86 @@ export default function App() {
                 </button>
               </form>
             </section>
+          </div>
 
-            <section className="rounded-lg border-2 border-line bg-[#fff8ef] p-3 shadow-stamp">
+          <div className="min-w-0">
+            <section className="h-full rounded-lg border-2 border-line bg-[#fff8ef] p-4 shadow-stamp">
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-bold text-ink">任务总览</h2>
+                <h2 className="text-xl font-bold text-ink">任务总览</h2>
                 <span className="text-xs text-smoke">按日期</span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
                 <StatCard label="总任务" value={data?.stats.total ?? 0} />
                 <StatCard label="待完成" value={data?.stats.open ?? 0} />
                 <StatCard label="已完成" value={data?.stats.done ?? 0} />
                 <StatCard label="有标签" value={data?.stats.tagged ?? 0} />
               </div>
             </section>
-          </aside>
+          </div>
+        </section>
 
-          <section className="rounded-lg border-2 border-line bg-[#f3eadb] p-3 shadow-stamp md:p-4">
-            <div className="flex flex-col gap-3 border-b-2 border-dashed border-line pb-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="rounded-md border border-dashed border-line px-3 py-1.5 text-xs text-smoke">
-                  {openTodos.length} 项待办
-                </span>
+        <section className="rounded-lg border-2 border-line bg-[#f3eadb] p-3 shadow-stamp md:p-4">
+          <div className="flex flex-col gap-3 border-b-2 border-dashed border-line pb-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-md border border-dashed border-line px-3 py-1.5 text-xs text-smoke">
+                {openTodos.length} 项待办
+              </span>
+            </div>
+
+            {(error || notice) && (
+              <div
+                className={[
+                  'rounded-lg border px-3 py-2 text-sm',
+                  error
+                    ? 'border-clay bg-[#fff4ee] text-[#8a3f1f]'
+                    : 'border-moss bg-[#f2f6ee] text-[#405131]',
+                ].join(' ')}
+                aria-live="polite"
+              >
+                {error ?? notice}
               </div>
+            )}
+          </div>
 
-              {(error || notice) && (
+          <div className="mt-4 space-y-5">
+            {doneTodos.length > 0 && (
+              <CompletedGroupTrigger
+                count={doneTodos.length}
+                onOpen={() => setCompletedModalOpen(true)}
+              />
+            )}
+
+            {loading ? (
+              Array.from({ length: 3 }).map((_, index) => (
                 <div
-                  className={[
-                    'rounded-lg border px-3 py-2 text-sm',
-                    error
-                      ? 'border-clay bg-[#fff4ee] text-[#8a3f1f]'
-                      : 'border-moss bg-[#f2f6ee] text-[#405131]',
-                  ].join(' ')}
-                  aria-live="polite"
-                >
-                  {error ?? notice}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 space-y-5">
-              {doneTodos.length > 0 && (
-                <CompletedGroupTrigger
-                  count={doneTodos.length}
-                  onOpen={() => setCompletedModalOpen(true)}
+                  key={index}
+                  className="h-24 animate-pulse rounded-lg border-2 border-line bg-white/80"
                 />
-              )}
-
-              {loading ? (
-                Array.from({ length: 3 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="h-24 animate-pulse rounded-lg border-2 border-line bg-white/80"
-                  />
-                ))
-              ) : timeline.length > 0 ? (
-                timeline.map((group) => (
-                  <TimelineGroup
-                    key={group.key}
-                    label={group.label}
-                    items={group.items}
-                    collapsed={collapsedDates.has(group.key)}
-                    busyId={busyId}
-                    uploadingId={uploadingId}
-                    onToggleGroup={() => toggleDateGroup(group.key)}
-                    onToggle={handleToggle}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    onUpload={handleUpload}
-                    onDeleteAttachment={handleDeleteAttachment}
-                  />
-                ))
-              ) : (
-                <div className="rounded-lg border-2 border-dashed border-line bg-white px-6 py-10 text-center">
-                  <p className="text-sm text-smoke">当前没有待完成任务</p>
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
+              ))
+            ) : timeline.length > 0 ? (
+              timeline.map((group) => (
+                <TimelineGroup
+                  key={group.key}
+                  label={group.label}
+                  items={group.items}
+                  collapsed={collapsedDates.has(group.key)}
+                  busyId={busyId}
+                  uploadingId={uploadingId}
+                  onToggleGroup={() => toggleDateGroup(group.key)}
+                  onToggle={handleToggle}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onUpload={handleUpload}
+                  onDeleteAttachment={handleDeleteAttachment}
+                />
+              ))
+            ) : (
+              <div className="rounded-lg border-2 border-dashed border-line bg-white px-6 py-10 text-center">
+                <p className="text-sm text-smoke">当前没有待完成任务</p>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
       {completedModalOpen && (
