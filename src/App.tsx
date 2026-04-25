@@ -718,8 +718,8 @@ export default function App() {
   return (
     <main className="min-h-screen bg-paper text-ink">
       <div className="mx-auto w-full max-w-[1600px] px-3 py-3 md:px-4 xl:px-5">
-        <div className="grid gap-3 2xl:grid-cols-[280px_minmax(0,1fr)] 2xl:items-start">
-          <aside className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start 2xl:sticky 2xl:top-3 2xl:flex 2xl:flex-col">
+        <div className="grid gap-3 2xl:grid-cols-[minmax(360px,28vw)_minmax(0,1fr)] 2xl:items-start">
+          <aside className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,24vw)] lg:items-start 2xl:sticky 2xl:top-3 2xl:flex 2xl:flex-col">
             <section className="rounded-lg border-2 border-line bg-white p-4 shadow-stamp">
               <div className="flex items-center justify-between gap-3">
                 <div>
