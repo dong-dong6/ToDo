@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createTodo, deleteAttachment, deleteTodo, getTodos, updateTodo, uploadAttachment } from './lib/api'
 import type { Priority, Todo, TodoAttachment, TodoFilter, TodoResponse } from './lib/types'
 
@@ -73,6 +73,18 @@ function formatBytes(size: number) {
   }
 
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatSelectedFiles(files: File[]) {
+  if (files.length === 0) {
+    return '未选择附件'
+  }
+
+  if (files.length === 1) {
+    return files[0].name
+  }
+
+  return `${files.length} 个附件`
 }
 
 function buildTimeline(todos: Todo[]) {
@@ -348,10 +360,16 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null)
   const [completedExpanded, setCompletedExpanded] = useState(false)
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
+  const [formFiles, setFormFiles] = useState<File[]>([])
+  const formFileInputRef = useRef<HTMLInputElement>(null)
 
   function resetForm() {
     setForm(initialForm)
+    setFormFiles([])
     setEditingTodoId(null)
+    if (formFileInputRef.current) {
+      formFileInputRef.current.value = ''
+    }
   }
 
   async function refresh() {
@@ -417,25 +435,42 @@ export default function App() {
 
     try {
       const isEditing = editingTodoId !== null
+      let savedTodo: Todo
 
       if (isEditing) {
-        await updateTodo(editingTodoId, {
+        savedTodo = await updateTodo(editingTodoId, {
           title: form.title.trim(),
           notes: form.notes.trim(),
           priority: form.priority,
           dueDate: form.dueDate,
         })
       } else {
-        await createTodo({
+        savedTodo = await createTodo({
           title: form.title.trim(),
           notes: form.notes.trim(),
           priority: form.priority,
           dueDate: form.dueDate,
         })
       }
+
+      if (formFiles.length > 0) {
+        setUploadingId(savedTodo.id)
+        for (const file of formFiles) {
+          await uploadAttachment(savedTodo.id, file)
+        }
+      }
+
       resetForm()
       await refresh()
-      setNotice(isEditing ? '任务已更新。' : '任务已创建。')
+      setNotice(
+        formFiles.length > 0
+          ? isEditing
+            ? '任务已更新，附件已上传。'
+            : '任务已创建，附件已上传。'
+          : isEditing
+            ? '任务已更新。'
+            : '任务已创建。',
+      )
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -446,6 +481,7 @@ export default function App() {
       )
     } finally {
       setSubmitting(false)
+      setUploadingId(null)
     }
   }
 
@@ -461,8 +497,23 @@ export default function App() {
       priority: todo.priority,
       dueDate: todo.dueDate ?? '',
     })
+    setFormFiles([])
+    if (formFileInputRef.current) {
+      formFileInputRef.current.value = ''
+    }
     setError(null)
     setNotice('正在编辑任务。')
+  }
+
+  function handleFormFilesChange(event: ChangeEvent<HTMLInputElement>) {
+    setFormFiles(Array.from(event.target.files ?? []))
+  }
+
+  function clearFormFiles() {
+    setFormFiles([])
+    if (formFileInputRef.current) {
+      formFileInputRef.current.value = ''
+    }
   }
 
   async function handleToggle(todo: Todo) {
@@ -623,12 +674,54 @@ export default function App() {
                   </label>
                 </div>
 
+                <div className="rounded-lg border-2 border-dashed border-line bg-paper p-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:flex-col xl:items-stretch 2xl:flex-row 2xl:items-center">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-smoke">附件</p>
+                      <p className="mt-1 truncate text-sm text-ink">
+                        {formatSelectedFiles(formFiles)}
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-sand">
+                        选择附件
+                        <input
+                          ref={formFileInputRef}
+                          type="file"
+                          multiple
+                          className="hidden"
+                          disabled={submitting}
+                          onChange={handleFormFilesChange}
+                        />
+                      </label>
+
+                      {formFiles.length > 0 && (
+                        <button
+                          type="button"
+                          disabled={submitting}
+                          onClick={clearFormFiles}
+                          className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          清空
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <button
                   type="submit"
                   disabled={submitting}
                   className="w-full rounded-lg border-2 border-line bg-clay px-4 py-2.5 text-sm font-bold text-white transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {submitting ? '保存中...' : editingTodoId ? '保存修改' : '创建任务'}
+                  {submitting
+                    ? formFiles.length > 0
+                      ? '保存并上传中...'
+                      : '保存中...'
+                    : editingTodoId
+                      ? '保存修改'
+                      : '创建任务'}
                 </button>
               </form>
             </section>
