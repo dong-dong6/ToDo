@@ -187,7 +187,7 @@ function TodoItem(props: {
   const deadlineLabel = formatDeadlineLabel(props.todo.dueDate)
 
   return (
-    <article className="rounded-lg border-2 border-line bg-white p-3 shadow-stamp">
+    <article className="rounded-lg border border-line bg-white p-3 shadow-soft">
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div className="flex gap-3">
@@ -298,7 +298,7 @@ function TimelineGroup(props: {
   onDeleteAttachment: (todo: Todo, attachment: TodoAttachment) => Promise<void>
 }) {
   return (
-    <section className="rounded-lg border-2 border-line bg-[#fff8ef] shadow-stamp">
+    <section className="rounded-lg border border-line bg-[#fffaf4] shadow-soft">
       <button
         type="button"
         onClick={props.onToggleGroup}
@@ -336,7 +336,7 @@ function TimelineGroup(props: {
 
 function CompletedGroupTrigger(props: { count: number; onOpen: () => void }) {
   return (
-    <section className="rounded-lg border-2 border-line bg-[#fff8ef] shadow-stamp">
+    <section className="rounded-lg border border-line bg-[#fffaf4] shadow-soft">
       <button
         type="button"
         onClick={props.onOpen}
@@ -717,29 +717,33 @@ export default function App() {
 
   return (
     <main className="min-h-screen bg-paper text-ink">
-      <div className="mx-auto grid w-full max-w-[1680px] gap-4 px-3 py-3 md:px-4 xl:px-5">
-        <section className="grid gap-3 lg:grid-cols-2 lg:items-start">
-          <div className="min-w-0">
-            <section className="rounded-lg border-2 border-line bg-white p-4 shadow-stamp">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-medium text-smoke">
-                    {editingTodoId ? '编辑任务' : '新建任务'}
-                  </p>
-                  <h1 className="mt-1 text-xl font-bold text-ink">ToDo</h1>
+      <div className="todo-layout">
+        <section className="control-panel">
+          <section className="control-card workspace-panel bg-white">
+            <div className="workspace-top">
+              <div className="new-task-card">
+                <div className="new-task-header flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium text-smoke">
+                      {editingTodoId ? '编辑任务' : '新建任务'}
+                    </p>
+                    <h1 className="new-task-title mt-1 text-xl font-bold text-ink">ToDo</h1>
+                  </div>
+                  {editingTodoId && (
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper"
+                    >
+                      取消
+                    </button>
+                  )}
                 </div>
-                {editingTodoId && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper"
-                  >
-                    取消
-                  </button>
-                )}
-              </div>
 
-              <form className="mt-3 space-y-3" onSubmit={handleSubmit}>
+                <form
+                  className="new-task-form mt-3 space-y-3 landscape:space-y-2"
+                  onSubmit={handleSubmit}
+                >
                 <input
                   required
                   value={form.title}
@@ -747,7 +751,7 @@ export default function App() {
                     setForm((current) => ({ ...current, title: event.target.value }))
                   }
                   placeholder="任务标题"
-                  className="w-full rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-base outline-none transition focus:bg-white"
+                  className="new-task-title-input w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-base outline-none transition focus:bg-white"
                 />
 
                 <textarea
@@ -757,10 +761,10 @@ export default function App() {
                     setForm((current) => ({ ...current, notes: event.target.value }))
                   }
                   placeholder="备注"
-                  className="w-full resize-y rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
+                  className="new-task-notes w-full resize-y rounded-lg border border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
                 />
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="new-task-meta grid gap-3 sm:grid-cols-2">
                   <div className="block">
                     <span className="mb-1 block text-xs font-medium text-smoke">标签配置</span>
                     <div className="flex gap-2">
@@ -776,13 +780,13 @@ export default function App() {
                           }
                         }}
                         placeholder="输入标签"
-                        className="min-w-0 flex-1 rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
+                        className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
                       />
                       <button
                         type="button"
                         disabled={form.tags.length >= 6}
                         onClick={addFormTag}
-                        className="rounded-lg border-2 border-line bg-white px-3 py-2 text-sm font-medium text-ink transition hover:bg-sand disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink transition hover:bg-sand disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         添加
                       </button>
@@ -817,81 +821,82 @@ export default function App() {
                       onChange={(event) =>
                         setForm((current) => ({ ...current, dueDate: event.target.value }))
                       }
-                      className="w-full rounded-lg border-2 border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
+                      className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
                     />
                   </label>
                 </div>
 
-                <div className="rounded-lg border-2 border-dashed border-line bg-paper p-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-smoke">附件</p>
-                      <p className="mt-1 truncate text-sm text-ink">
-                        {formatSelectedFiles(formFiles)}
-                      </p>
-                    </div>
+                <div className="new-task-footer">
+                  <div className="new-task-attachment rounded-lg border border-dashed border-line bg-paper p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-smoke">附件</p>
+                        <p className="mt-1 truncate text-sm text-ink">
+                          {formatSelectedFiles(formFiles)}
+                        </p>
+                      </div>
 
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-sand">
-                        选择附件
-                        <input
-                          ref={formFileInputRef}
-                          type="file"
-                          multiple
-                          className="hidden"
-                          disabled={submitting}
-                          onChange={handleFormFilesChange}
-                        />
-                      </label>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-sand">
+                          选择附件
+                          <input
+                            ref={formFileInputRef}
+                            type="file"
+                            multiple
+                            className="hidden"
+                            disabled={submitting}
+                            onChange={handleFormFilesChange}
+                          />
+                        </label>
 
-                      {formFiles.length > 0 && (
-                        <button
-                          type="button"
-                          disabled={submitting}
-                          onClick={clearFormFiles}
-                          className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          清空
-                        </button>
-                      )}
+                        {formFiles.length > 0 && (
+                          <button
+                            type="button"
+                            disabled={submitting}
+                            onClick={clearFormFiles}
+                            className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            清空
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="new-task-submit w-full rounded-lg border border-line bg-clay px-4 py-2.5 text-sm font-bold text-white transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {submitting
+                      ? formFiles.length > 0
+                        ? '保存并上传中...'
+                        : '保存中...'
+                      : editingTodoId
+                        ? '保存修改'
+                        : '创建任务'}
+                  </button>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full rounded-lg border-2 border-line bg-clay px-4 py-2.5 text-sm font-bold text-white transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {submitting
-                    ? formFiles.length > 0
-                      ? '保存并上传中...'
-                      : '保存中...'
-                    : editingTodoId
-                      ? '保存修改'
-                      : '创建任务'}
-                </button>
-              </form>
-            </section>
-          </div>
-
-          <div className="min-w-0">
-            <section className="h-full rounded-lg border-2 border-line bg-[#fff8ef] p-4 shadow-stamp">
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-ink">任务总览</h2>
-                <span className="text-xs text-smoke">按日期</span>
+                </form>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-                <StatCard label="总任务" value={data?.stats.total ?? 0} />
-                <StatCard label="待完成" value={data?.stats.open ?? 0} />
-                <StatCard label="已完成" value={data?.stats.done ?? 0} />
-                <StatCard label="有标签" value={data?.stats.tagged ?? 0} />
-              </div>
-            </section>
-          </div>
+
+              <aside className="overview-panel">
+                <div className="overview-header">
+                  <h2 className="text-xl font-bold text-ink">任务总览</h2>
+                  <span className="text-xs text-smoke">按日期</span>
+                </div>
+                <div className="stats-grid">
+                  <StatCard label="总任务" value={data?.stats.total ?? 0} />
+                  <StatCard label="待完成" value={data?.stats.open ?? 0} />
+                  <StatCard label="已完成" value={data?.stats.done ?? 0} />
+                  <StatCard label="有标签" value={data?.stats.tagged ?? 0} />
+                </div>
+              </aside>
+            </div>
+          </section>
         </section>
 
-        <section className="rounded-lg border-2 border-line bg-[#f3eadb] p-3 shadow-stamp md:p-4">
+        <section className="task-panel">
           <div className="flex flex-col gap-3 border-b-2 border-dashed border-line pb-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-md border border-dashed border-line px-3 py-1.5 text-xs text-smoke">
@@ -914,7 +919,7 @@ export default function App() {
             )}
           </div>
 
-          <div className="mt-4 space-y-5">
+          <div className="task-list">
             {doneTodos.length > 0 && (
               <CompletedGroupTrigger
                 count={doneTodos.length}

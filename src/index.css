@@ -25,6 +25,315 @@ body {
   min-width: 320px;
 }
 
+.todo-layout {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 1720px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.control-panel {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+
+.control-card,
+.task-panel {
+  border: 1px solid #1f1a16;
+  border-radius: 8px;
+  box-shadow: 6px 6px 0 0 rgba(23, 23, 23, 0.1);
+}
+
+.control-card {
+  padding: 16px;
+}
+
+.workspace-panel {
+  padding: 14px;
+}
+
+.workspace-top {
+  display: grid;
+  gap: 14px;
+}
+
+.overview-panel {
+  border: 1px solid #1f1a16;
+  border-radius: 8px;
+  background: #fffaf4;
+  padding: 12px;
+  box-shadow: 4px 4px 0 0 rgba(23, 23, 23, 0.08);
+}
+
+.overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.task-panel {
+  min-width: 0;
+  min-height: 0;
+  padding: 14px;
+  background: #f3eadb;
+}
+
+.task-list {
+  margin-top: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.shadow-soft {
+  box-shadow: 4px 4px 0 0 rgba(23, 23, 23, 0.08);
+}
+
+.new-task-form {
+  display: grid;
+  gap: 12px;
+}
+
+.new-task-footer {
+  display: grid;
+  gap: 12px;
+}
+
+.new-task-submit {
+  min-height: 44px;
+}
+
+@media (min-width: 760px) {
+  .control-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-top {
+    grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.9fr);
+    align-items: start;
+  }
+}
+
+@media (min-width: 900px) and (min-aspect-ratio: 13 / 10) {
+  .todo-layout {
+    grid-template-columns: minmax(340px, 0.38fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    height: 100dvh;
+    padding: 16px 18px;
+  }
+
+  .control-panel {
+    align-content: start;
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+  }
+
+  .workspace-top {
+    grid-template-columns: 1fr;
+  }
+
+  .task-panel {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 32px);
+    overflow: hidden;
+  }
+
+  .task-list {
+    min-height: 0;
+    overflow: auto;
+    padding-right: 4px;
+  }
+}
+
+@media (min-width: 900px) and (max-aspect-ratio: 129 / 100) {
+  .todo-layout {
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 100dvh;
+  }
+
+  .control-panel {
+    gap: 14px;
+  }
+
+  .workspace-top {
+    grid-template-columns: minmax(0, 1.28fr) minmax(260px, 0.82fr);
+  }
+
+  .new-task-card {
+    padding: 2px;
+  }
+
+  .new-task-card h1 {
+    font-size: 1.125rem;
+    line-height: 1.35;
+  }
+
+  .new-task-card form {
+    margin-top: 10px;
+  }
+
+  .new-task-card input,
+  .new-task-card textarea {
+    font-size: 0.9375rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .new-task-card textarea {
+    min-height: 52px;
+  }
+
+  .new-task-card button[type='submit'] {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+
+  .new-task-footer {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+  }
+
+  .new-task-submit {
+    width: 132px;
+    padding-inline: 16px;
+  }
+
+  .task-panel {
+    min-height: 58dvh;
+  }
+}
+
+@media (min-width: 1280px) and (min-aspect-ratio: 13 / 10) {
+  .todo-layout {
+    grid-template-columns: minmax(380px, 0.34fr) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 760px) and (max-width: 1100px) {
+  .todo-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .control-panel {
+    gap: 12px;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .workspace-panel {
+    padding: 12px;
+  }
+
+  .workspace-top {
+    grid-template-columns: minmax(0, 1.22fr) minmax(230px, 0.78fr);
+    gap: 12px;
+  }
+
+  .new-task-card {
+    padding: 0;
+  }
+
+  .new-task-card h1 {
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+
+  .new-task-card form {
+    margin-top: 6px;
+  }
+
+  .new-task-card input,
+  .new-task-card textarea {
+    font-size: 0.875rem;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+
+  .new-task-card textarea {
+    min-height: 40px;
+  }
+
+  .new-task-header p,
+  .new-task-card .text-xs {
+    font-size: 11px;
+  }
+
+  .new-task-form {
+    gap: 10px;
+  }
+
+  .new-task-meta {
+    gap: 10px;
+  }
+
+  .new-task-attachment {
+    padding: 10px 12px;
+  }
+
+  .new-task-attachment .text-sm,
+  .new-task-card button,
+  .new-task-card label {
+    font-size: 0.8125rem;
+  }
+
+  .new-task-footer {
+    grid-template-columns: minmax(0, 1fr) 112px;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .new-task-submit {
+    width: 112px;
+    min-height: auto;
+    padding: 0.45rem 0.75rem;
+  }
+
+  .task-panel {
+    display: block;
+    max-height: none;
+    min-height: 48dvh;
+    overflow: visible;
+  }
+
+  .task-list {
+    overflow: visible;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 759px) {
+  .workspace-panel {
+    padding: 12px;
+  }
+
+  .workspace-top {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .new-task-footer {
+    gap: 10px;
+  }
+
+  .new-task-submit {
+    width: 100%;
+  }
+}
+
 button,
 input,
 textarea,
