@@ -125,6 +125,154 @@ body {
   min-height: 44px;
 }
 
+.tag-input-shell {
+  display: flex;
+  min-height: 42px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-input-chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.tag-input-chip span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-input-field::placeholder {
+  color: #8a8177;
+}
+
+.date-picker {
+  position: relative;
+}
+
+.date-picker-trigger {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.date-picker-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  width: min(100vw - 40px, 292px);
+  border: 1px solid #1f1a16;
+  border-radius: 8px;
+  background: #fffaf4;
+  padding: 10px;
+  box-shadow: 5px 5px 0 0 rgba(23, 23, 23, 0.12);
+}
+
+.date-picker-head {
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.date-picker-head strong {
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.date-picker-head button,
+.date-picker-actions button {
+  border: 1px solid #1f1a16;
+  border-radius: 6px;
+  background: #f8f4ec;
+  color: #171717;
+  font-weight: 700;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.date-picker-head button {
+  width: 32px;
+  height: 30px;
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.date-picker-head button:hover,
+.date-picker-actions button:hover {
+  background: #1f1a16;
+  color: #fffaf4;
+}
+
+.date-picker-weekdays,
+.date-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.date-picker-weekdays {
+  margin-bottom: 4px;
+  color: #6f665d;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.date-picker-day {
+  display: inline-flex;
+  aspect-ratio: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.date-picker-day:hover {
+  border-color: #1f1a16;
+  background: #f3eadb;
+}
+
+.date-picker-day-today {
+  border-color: #d86f45;
+}
+
+.date-picker-day-selected {
+  border-color: #1f1a16;
+  background: #d86f45;
+  color: white;
+}
+
+.date-picker-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.date-picker-actions button {
+  flex: 1;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.75rem;
+}
+
 @media (min-width: 760px) {
   .control-panel {
     grid-template-columns: 1fr;
@@ -216,6 +364,11 @@ body {
     padding-bottom: 0.5rem;
   }
 
+  .new-task-card .tag-input-field {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
   .new-task-card textarea {
     min-height: 52px;
   }
@@ -286,6 +439,11 @@ body {
     font-size: 0.875rem;
     padding-top: 0.4rem;
     padding-bottom: 0.4rem;
+  }
+
+  .new-task-card .tag-input-field {
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
   }
 
   .new-task-card textarea {

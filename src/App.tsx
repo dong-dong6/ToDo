@@ -65,6 +65,13 @@ function formatDateTime(value: string) {
   }).format(new Date(value))
 }
 
+function formatMonthLabel(value: Date) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+  }).format(value)
+}
+
 function formatBytes(size: number) {
   if (size < 1024) {
     return `${size} B`
@@ -97,6 +104,25 @@ function tagTone(index: number) {
   return tagTones[index % tagTones.length]
 }
 
+function buildCalendarDays(monthDate: Date) {
+  const year = monthDate.getFullYear()
+  const month = monthDate.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const firstWeekday = firstDay.getDay()
+  const startDate = new Date(year, month, 1 - firstWeekday)
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(startDate)
+    date.setDate(startDate.getDate() + index)
+
+    return {
+      key: toLocalDateKey(date),
+      date,
+      inMonth: date.getMonth() === month,
+    }
+  })
+}
+
 function buildTimeline(todos: Todo[]) {
   const groups = new Map<string, Todo[]>()
 
@@ -121,6 +147,121 @@ function StatCard(props: { label: string; value: number }) {
     <div className="stat-item">
       <p className="text-[11px] font-medium text-smoke">{props.label}</p>
       <p className="mt-1 text-xl font-bold leading-none text-ink">{props.value}</p>
+    </div>
+  )
+}
+
+function DatePicker(props: {
+  value: string
+  onChange: (value: string) => void
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [viewMonth, setViewMonth] = useState(() =>
+    props.value ? dateFromKey(props.value) : new Date(),
+  )
+  const todayKey = toLocalDateKey(new Date())
+  const selectedLabel = props.value ? formatDeadlineLabel(props.value) : '选择日期'
+  const days = useMemo(() => buildCalendarDays(viewMonth), [viewMonth])
+
+  useEffect(() => {
+    if (props.value) {
+      setViewMonth(dateFromKey(props.value))
+    }
+  }, [props.value])
+
+  function shiftMonth(offset: number) {
+    setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1))
+  }
+
+  return (
+    <div
+      className="date-picker"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setOpen(false)
+        }
+      }}
+    >
+      <button
+        type="button"
+        disabled={props.disabled}
+        onClick={() => setOpen((current) => !current)}
+        className={[
+          'date-picker-trigger w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-left text-sm outline-none transition hover:bg-white focus:bg-white disabled:cursor-not-allowed disabled:opacity-60',
+          props.value ? 'text-ink' : 'text-smoke',
+        ].join(' ')}
+      >
+        <span>{selectedLabel}</span>
+        <span aria-hidden="true">⌄</span>
+      </button>
+
+      {open && (
+        <div className="date-picker-panel" role="dialog" aria-label="选择 DDL 日期">
+          <div className="date-picker-head">
+            <button type="button" onClick={() => shiftMonth(-1)} aria-label="上个月">
+              ‹
+            </button>
+            <strong>{formatMonthLabel(viewMonth)}</strong>
+            <button type="button" onClick={() => shiftMonth(1)} aria-label="下个月">
+              ›
+            </button>
+          </div>
+
+          <div className="date-picker-weekdays" aria-hidden="true">
+            {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+              <span key={day}>{day}</span>
+            ))}
+          </div>
+
+          <div className="date-picker-grid">
+            {days.map((item) => {
+              const selected = item.key === props.value
+              const today = item.key === todayKey
+
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => {
+                    props.onChange(item.key)
+                    setOpen(false)
+                  }}
+                  className={[
+                    'date-picker-day',
+                    item.inMonth ? 'text-ink' : 'text-smoke',
+                    today ? 'date-picker-day-today' : '',
+                    selected ? 'date-picker-day-selected' : '',
+                  ].join(' ')}
+                >
+                  {item.date.getDate()}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="date-picker-actions">
+            <button
+              type="button"
+              onClick={() => {
+                props.onChange(todayKey)
+                setOpen(false)
+              }}
+            >
+              今天
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                props.onChange('')
+                setOpen(false)
+              }}
+            >
+              清空
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -778,7 +919,21 @@ export default function App() {
                 <div className="new-task-meta grid gap-3 sm:grid-cols-2">
                   <div className="block">
                     <span className="mb-1 block text-xs font-medium text-smoke">标签配置</span>
-                    <div>
+                    <div className="tag-input-shell rounded-lg border border-line bg-paper px-2 py-1.5 transition focus-within:bg-white">
+                      {form.tags.map((tag, index) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => removeFormTag(tag)}
+                          className={[
+                            'tag-input-chip rounded-md px-2 py-1 text-[11px] font-semibold transition hover:opacity-75',
+                            tagTone(index),
+                          ].join(' ')}
+                        >
+                          <span>{tag}</span>
+                          <span aria-hidden="true">x</span>
+                        </button>
+                      ))}
                       <input
                         value={form.tagInput}
                         disabled={form.tags.length >= 6}
@@ -792,40 +947,20 @@ export default function App() {
                           }
                         }}
                         placeholder={form.tags.length >= 6 ? '标签已满' : '输入标签后按回车'}
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                        className="tag-input-field min-w-[9rem] flex-1 bg-transparent px-1 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
                       />
                     </div>
-
-                    {form.tags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {form.tags.map((tag, index) => (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => removeFormTag(tag)}
-                            className={[
-                              'rounded-md px-2 py-1 text-[11px] font-semibold transition hover:opacity-75',
-                              tagTone(index),
-                            ].join(' ')}
-                          >
-                            {tag} x
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
 
                   <label className="block">
                     <span className="mb-1 block text-xs font-medium text-smoke">
                       DDL 最晚日期
                     </span>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={form.dueDate}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, dueDate: event.target.value }))
+                      onChange={(value) =>
+                        setForm((current) => ({ ...current, dueDate: value }))
                       }
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm outline-none transition focus:bg-white"
                     />
                   </label>
                 </div>
