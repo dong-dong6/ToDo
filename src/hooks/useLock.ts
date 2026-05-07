@@ -63,11 +63,12 @@ export function useLock() {
     const token = getStoredToken()
     api.getAuthStatus(token).then((status) => {
       setHasPassword(status.hasPassword)
-      if (status.authenticated) {
+      if (status.hasPassword && status.authenticated) {
         unlockedRef.current = true
         setLocked(false)
         resetTimer()
       }
+      // else: stays locked — shows setup screen (no password) or unlock screen (has password)
       setChecking(false)
     }).catch(() => {
       setChecking(false)
