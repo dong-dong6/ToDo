@@ -1,6 +1,20 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { createTodo, deleteAttachment, deleteTodo, getTodos, updateTodo, uploadAttachment } from './lib/api'
-import type { Todo, TodoAttachment, TodoResponse } from './lib/types'
+import { ChangeEvent, FormEvent, useMemo, useRef, useState } from 'react'
+import { useLock } from './hooks/useLock'
+import { useTodos } from './hooks/useTodos'
+import { CompletedGroupTrigger } from './components/CompletedGroupTrigger'
+import { CompletedTaskModal } from './components/CompletedTaskModal'
+import { DatePicker } from './components/DatePicker'
+import { LockScreen } from './components/LockScreen'
+import { SecuritySettings } from './components/SecuritySettings'
+import { StatCard } from './components/StatCard'
+import { TimelineGroup } from './components/TimelineGroup'
+import type { Todo } from './lib/types'
+import {
+  buildTimeline,
+  formatSelectedFiles,
+  normalizeTag,
+  tagTone,
+} from './lib/utils'
 
 const initialForm = {
   title: '',
@@ -10,592 +24,28 @@ const initialForm = {
   dueDate: '',
 }
 
-const tagTones = [
-  'bg-sand text-ink',
-  'bg-[#edf2e6] text-[#405131]',
-  'bg-[#fff4ee] text-[#8a3f1f]',
-  'bg-white/80 text-ink',
-]
-
-function toLocalDateKey(value: string | Date) {
-  const date = typeof value === 'string' ? new Date(value) : value
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
-}
-
-function dateFromKey(value: string) {
-  const [year, month, day] = value.split('-').map(Number)
-  return new Date(year, month - 1, day)
-}
-
-function formatTaskDateLabel(value: string) {
-  const today = toLocalDateKey(new Date())
-  const dateText = new Intl.DateTimeFormat('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-  }).format(dateFromKey(value))
-
-  if (value === today) {
-    return `今天 · ${dateText}`
-  }
-
-  return dateText
-}
-
-function formatDeadlineLabel(value: string | null) {
-  if (!value) {
-    return null
-  }
-
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-  }).format(dateFromKey(value))
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value))
-}
-
-function formatMonthLabel(value: Date) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-  }).format(value)
-}
-
-function formatBytes(size: number) {
-  if (size < 1024) {
-    return `${size} B`
-  }
-
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`
-  }
-
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function formatSelectedFiles(files: File[]) {
-  if (files.length === 0) {
-    return '未选择附件'
-  }
-
-  if (files.length === 1) {
-    return files[0].name
-  }
-
-  return `${files.length} 个附件`
-}
-
-function normalizeTag(value: string) {
-  return value.trim().slice(0, 24)
-}
-
-function tagTone(index: number) {
-  return tagTones[index % tagTones.length]
-}
-
-function buildCalendarDays(monthDate: Date) {
-  const year = monthDate.getFullYear()
-  const month = monthDate.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const firstWeekday = firstDay.getDay()
-  const startDate = new Date(year, month, 1 - firstWeekday)
-
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(startDate)
-    date.setDate(startDate.getDate() + index)
-
-    return {
-      key: toLocalDateKey(date),
-      date,
-      inMonth: date.getMonth() === month,
-    }
-  })
-}
-
-function buildTimeline(todos: Todo[]) {
-  const groups = new Map<string, Todo[]>()
-
-  for (const todo of todos) {
-    const key = toLocalDateKey(todo.createdAt)
-    const list = groups.get(key) ?? []
-    list.push(todo)
-    groups.set(key, list)
-  }
-
-  return Array.from(groups.entries())
-    .sort(([left], [right]) => right.localeCompare(left))
-    .map(([key, items]) => ({
-      key,
-      label: formatTaskDateLabel(key),
-      items: items.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
-    }))
-}
-
-function StatCard(props: { label: string; value: number }) {
-  return (
-    <div className="stat-item">
-      <p className="text-[11px] font-medium text-smoke">{props.label}</p>
-      <p className="mt-1 text-xl font-bold leading-none text-ink">{props.value}</p>
-    </div>
-  )
-}
-
-function DatePicker(props: {
-  value: string
-  onChange: (value: string) => void
-  disabled?: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const [viewMonth, setViewMonth] = useState(() =>
-    props.value ? dateFromKey(props.value) : new Date(),
-  )
-  const todayKey = toLocalDateKey(new Date())
-  const selectedLabel = props.value ? formatDeadlineLabel(props.value) : '选择日期'
-  const days = useMemo(() => buildCalendarDays(viewMonth), [viewMonth])
-
-  useEffect(() => {
-    if (props.value) {
-      setViewMonth(dateFromKey(props.value))
-    }
-  }, [props.value])
-
-  function shiftMonth(offset: number) {
-    setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1))
-  }
-
-  return (
-    <div
-      className="date-picker"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          setOpen(false)
-        }
-      }}
-    >
-      <button
-        type="button"
-        disabled={props.disabled}
-        onClick={() => setOpen((current) => !current)}
-        className={[
-          'date-picker-trigger w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-left text-sm outline-none transition hover:bg-white focus:bg-white disabled:cursor-not-allowed disabled:opacity-60',
-          props.value ? 'text-ink' : 'text-smoke',
-        ].join(' ')}
-      >
-        <span>{selectedLabel}</span>
-        <span aria-hidden="true">⌄</span>
-      </button>
-
-      {open && (
-        <div className="date-picker-panel" role="dialog" aria-label="选择 DDL 日期">
-          <div className="date-picker-head">
-            <button type="button" onClick={() => shiftMonth(-1)} aria-label="上个月">
-              ‹
-            </button>
-            <strong>{formatMonthLabel(viewMonth)}</strong>
-            <button type="button" onClick={() => shiftMonth(1)} aria-label="下个月">
-              ›
-            </button>
-          </div>
-
-          <div className="date-picker-weekdays" aria-hidden="true">
-            {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-
-          <div className="date-picker-grid">
-            {days.map((item) => {
-              const selected = item.key === props.value
-              const today = item.key === todayKey
-
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => {
-                    props.onChange(item.key)
-                    setOpen(false)
-                  }}
-                  className={[
-                    'date-picker-day',
-                    item.inMonth ? 'text-ink' : 'text-smoke',
-                    today ? 'date-picker-day-today' : '',
-                    selected ? 'date-picker-day-selected' : '',
-                  ].join(' ')}
-                >
-                  {item.date.getDate()}
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="date-picker-actions">
-            <button
-              type="button"
-              onClick={() => {
-                props.onChange(todayKey)
-                setOpen(false)
-              }}
-            >
-              今天
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                props.onChange('')
-                setOpen(false)
-              }}
-            >
-              清空
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function AttachmentList(props: {
-  attachments: TodoAttachment[]
-  completed: boolean
-  busy: boolean
-  onDelete: (todo: Todo, attachment: TodoAttachment) => Promise<void>
-  todo: Todo
-}) {
-  if (props.attachments.length === 0) {
-    return null
-  }
-
-  return (
-    <div className="mt-3 space-y-2 rounded-lg border border-dashed border-line bg-[#fcfaf5] p-2">
-      {props.attachments.map((attachment) => (
-        <div
-          key={attachment.id}
-          className="flex flex-col gap-2 rounded-md border border-line bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div className="min-w-0">
-            <a
-              href={attachment.url}
-              target="_blank"
-              rel="noreferrer"
-              className="block truncate text-sm font-semibold text-ink underline-offset-4 hover:underline"
-            >
-              {attachment.fileName}
-            </a>
-            <p className="mt-1 text-xs text-smoke">
-              {formatBytes(attachment.sizeBytes)} · {formatDateTime(attachment.createdAt)}
-            </p>
-          </div>
-
-          {!props.completed && (
-            <button
-              type="button"
-              disabled={props.busy}
-              onClick={() => void props.onDelete(props.todo, attachment)}
-              className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              删除
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function TodoItem(props: {
-  todo: Todo
-  busy: boolean
-  compact?: boolean
-  uploading: boolean
-  onToggle: (todo: Todo) => Promise<void>
-  onEdit?: (todo: Todo) => void
-  onDelete: (id: string) => Promise<void>
-  onUpload: (todo: Todo, event: ChangeEvent<HTMLInputElement>) => Promise<void>
-  onDeleteAttachment: (todo: Todo, attachment: TodoAttachment) => Promise<void>
-}) {
-  const deadlineLabel = formatDeadlineLabel(props.todo.dueDate)
-
-  return (
-    <article className="rounded-lg border border-line bg-white p-3 shadow-soft">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-          <div className="flex gap-3">
-            <button
-              type="button"
-              aria-label={props.todo.completed ? '恢复为待办' : '标记为完成'}
-              disabled={props.busy}
-              onClick={() => void props.onToggle(props.todo)}
-              className={[
-                'mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 border-line transition',
-                props.todo.completed ? 'bg-moss' : 'bg-paper',
-              ].join(' ')}
-            >
-              <span className="sr-only">toggle</span>
-            </button>
-
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-semibold leading-6 text-ink">{props.todo.title}</h3>
-                {props.todo.tags.map((tag, index) => (
-                  <span
-                    key={tag}
-                    className={[
-                      'rounded-md px-2 py-1 text-[11px] font-semibold',
-                      tagTone(index),
-                    ].join(' ')}
-                  >
-                    {tag}
-                  </span>
-                ))}
-                {deadlineLabel && (
-                  <span className="rounded-md border border-dashed border-line px-2 py-1 text-[11px] text-smoke">
-                    DDL {deadlineLabel}
-                  </span>
-                )}
-              </div>
-
-              {!props.compact && props.todo.notes && (
-                <p className="mt-2 text-sm leading-6 text-smoke">{props.todo.notes}</p>
-              )}
-
-              {props.compact && props.todo.completedAt && (
-                <p className="mt-2 text-sm text-smoke">
-                  完成于 {formatDateTime(props.todo.completedAt)}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-            {!props.compact && !props.todo.completed && (
-              <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-sand">
-                {props.uploading ? '上传中...' : '附件'}
-                <input
-                  type="file"
-                  className="hidden"
-                  disabled={props.busy || props.uploading}
-                  onChange={(event) => void props.onUpload(props.todo, event)}
-                />
-              </label>
-            )}
-
-            {!props.compact && !props.todo.completed && props.onEdit && (
-              <button
-                type="button"
-                disabled={props.busy}
-                onClick={() => props.onEdit?.(props.todo)}
-                className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-sand disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                编辑
-              </button>
-            )}
-
-            <button
-              type="button"
-              disabled={props.busy}
-              onClick={() => void props.onDelete(props.todo.id)}
-              className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              删除
-            </button>
-          </div>
-        </div>
-
-        <AttachmentList
-          attachments={props.todo.attachments}
-          completed={props.todo.completed}
-          busy={props.busy}
-          onDelete={props.onDeleteAttachment}
-          todo={props.todo}
-        />
-      </div>
-    </article>
-  )
-}
-
-function TimelineGroup(props: {
-  label: string
-  items: Todo[]
-  collapsed: boolean
-  busyId: string | null
-  uploadingId: string | null
-  onToggleGroup: () => void
-  onToggle: (todo: Todo) => Promise<void>
-  onEdit: (todo: Todo) => void
-  onDelete: (id: string) => Promise<void>
-  onUpload: (todo: Todo, event: ChangeEvent<HTMLInputElement>) => Promise<void>
-  onDeleteAttachment: (todo: Todo, attachment: TodoAttachment) => Promise<void>
-}) {
-  return (
-    <section className="rounded-lg border border-line bg-[#fffaf4] shadow-soft">
-      <button
-        type="button"
-        onClick={props.onToggleGroup}
-        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition hover:bg-white/50"
-      >
-        <div>
-          <p className="text-[11px] font-medium text-smoke">任务日期</p>
-          <h3 className="mt-1 text-base font-bold leading-5 text-ink">{props.label}</h3>
-        </div>
-        <span className="shrink-0 rounded-md border border-line bg-white px-3 py-1.5 text-xs text-smoke">
-          {props.collapsed ? '展开' : '收起'} · {props.items.length} 项
-        </span>
-      </button>
-
-      {!props.collapsed && (
-        <div className="space-y-3 border-t-2 border-dashed border-line p-3">
-          {props.items.map((todo) => (
-            <TodoItem
-              key={todo.id}
-              todo={todo}
-              busy={props.busyId === todo.id}
-              uploading={props.uploadingId === todo.id}
-              onToggle={props.onToggle}
-              onEdit={props.onEdit}
-              onDelete={props.onDelete}
-              onUpload={props.onUpload}
-              onDeleteAttachment={props.onDeleteAttachment}
-            />
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
-function CompletedGroupTrigger(props: { count: number; onOpen: () => void }) {
-  return (
-    <section className="rounded-lg border border-line bg-[#fffaf4] shadow-soft">
-      <button
-        type="button"
-        onClick={props.onOpen}
-        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition hover:bg-white/50"
-      >
-        <div>
-          <p className="text-[11px] font-medium text-smoke">任务状态</p>
-          <h3 className="mt-1 text-base font-bold leading-5 text-ink">已完成</h3>
-        </div>
-        <span className="shrink-0 rounded-md border border-line bg-white px-3 py-1.5 text-xs text-smoke">
-          查看 · {props.count} 项
-        </span>
-      </button>
-    </section>
-  )
-}
-
-function CompletedTaskModal(props: {
-  todos: Todo[]
-  dateValue: string
-  searchValue: string
-  busyId: string | null
-  uploadingId: string | null
-  onDateChange: (value: string) => void
-  onSearchChange: (value: string) => void
-  onClose: () => void
-  onToggle: (todo: Todo) => Promise<void>
-  onDelete: (id: string) => Promise<void>
-  onUpload: (todo: Todo, event: ChangeEvent<HTMLInputElement>) => Promise<void>
-  onDeleteAttachment: (todo: Todo, attachment: TodoAttachment) => Promise<void>
-}) {
-  const dateOptions = Array.from(
-    new Set(props.todos.map((todo) => toLocalDateKey(todo.completedAt ?? todo.updatedAt))),
-  ).sort((left, right) => right.localeCompare(left))
-  const search = props.searchValue.trim().toLowerCase()
-  const visibleTodos = props.todos.filter((todo) => {
-    const dateKey = toLocalDateKey(todo.completedAt ?? todo.updatedAt)
-    const matchesDate = props.dateValue === '' || props.dateValue === dateKey
-    const text = [todo.title, todo.notes, ...todo.tags].join(' ').toLowerCase()
-
-    return matchesDate && (!search || text.includes(search))
-  })
-
-  return (
-    <div className="fixed inset-0 z-50 bg-ink/40 px-3 py-6">
-      <div className="mx-auto flex max-h-full w-full max-w-4xl flex-col rounded-lg border-2 border-line bg-paper shadow-stamp">
-        <div className="flex flex-col gap-3 border-b-2 border-dashed border-line p-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-medium text-smoke">已完成任务</p>
-            <h2 className="mt-1 text-xl font-bold text-ink">{visibleTodos.length} 项</h2>
-          </div>
-
-          <button
-            type="button"
-            onClick={props.onClose}
-            className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-ink hover:text-paper"
-          >
-            关闭
-          </button>
-        </div>
-
-        <div className="grid gap-3 border-b-2 border-dashed border-line p-4 md:grid-cols-[180px_1fr]">
-          <select
-            value={props.dateValue}
-            onChange={(event) => props.onDateChange(event.target.value)}
-            className="w-full rounded-lg border-2 border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:bg-paper"
-          >
-            <option value="">全部日期</option>
-            {dateOptions.map((date) => (
-              <option key={date} value={date}>
-                {formatTaskDateLabel(date)}
-              </option>
-            ))}
-          </select>
-
-          <input
-            value={props.searchValue}
-            onChange={(event) => props.onSearchChange(event.target.value)}
-            placeholder="搜索任务内容或标签"
-            className="w-full rounded-lg border-2 border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:bg-paper"
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-          {visibleTodos.length > 0 ? (
-            visibleTodos.map((todo) => (
-              <TodoItem
-                key={todo.id}
-                todo={todo}
-                busy={props.busyId === todo.id}
-                compact
-                uploading={props.uploadingId === todo.id}
-                onToggle={props.onToggle}
-                onDelete={props.onDelete}
-                onUpload={props.onUpload}
-                onDeleteAttachment={props.onDeleteAttachment}
-              />
-            ))
-          ) : (
-            <div className="rounded-lg border-2 border-dashed border-line bg-white px-6 py-10 text-center">
-              <p className="text-sm text-smoke">没有匹配的已完成任务</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function App() {
-  const [data, setData] = useState<TodoResponse | null>(null)
+  const {
+    state,
+    loading,
+    error,
+    notice,
+    busyId,
+    uploadingId,
+    submitting,
+    clearError,
+    clearNotice,
+    createTodo,
+    updateTodo,
+    toggleTodo,
+    deleteTodo,
+    uploadAttachment,
+    deleteAttachment,
+  } = useTodos()
+
+  const lock = useLock()
+
   const [form, setForm] = useState(initialForm)
-  const [loading, setLoading] = useState(true)
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [uploadingId, setUploadingId] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
   const [formFiles, setFormFiles] = useState<File[]>([])
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set())
@@ -603,6 +53,20 @@ export default function App() {
   const [completedDate, setCompletedDate] = useState('')
   const [completedSearch, setCompletedSearch] = useState('')
   const formFileInputRef = useRef<HTMLInputElement>(null)
+
+  const openTodos = useMemo(() => state.todos.filter((t) => !t.completed), [state.todos])
+  const doneTodos = useMemo(
+    () =>
+      state.todos
+        .filter((t) => t.completed)
+        .sort((a, b) => {
+          const left = a.completedAt ?? a.updatedAt
+          const right = b.completedAt ?? b.updatedAt
+          return right.localeCompare(left)
+        }),
+    [state.todos],
+  )
+  const timeline = useMemo(() => buildTimeline(openTodos), [openTodos])
 
   function resetForm() {
     setForm(initialForm)
@@ -613,35 +77,23 @@ export default function App() {
     }
   }
 
-  async function refresh() {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const result = await getTodos()
-      setData(result)
-    } catch (refreshError) {
-      setError(refreshError instanceof Error ? refreshError.message : '加载待办失败')
-    } finally {
-      setLoading(false)
+  function handleEdit(todo: Todo) {
+    if (todo.completed) return
+    setEditingTodoId(todo.id)
+    setForm({
+      title: todo.title,
+      notes: todo.notes,
+      tagInput: '',
+      tags: todo.tags,
+      dueDate: todo.dueDate ?? '',
+    })
+    setFormFiles([])
+    if (formFileInputRef.current) {
+      formFileInputRef.current.value = ''
     }
+    clearError()
+    clearNotice()
   }
-
-  useEffect(() => {
-    void refresh()
-  }, [])
-
-  const openTodos = useMemo(() => data?.todos.filter((todo) => !todo.completed) ?? [], [data])
-  const doneTodos = useMemo(
-    () => (data?.todos.filter((todo) => todo.completed) ?? []).sort((a, b) => {
-      const left = a.completedAt ?? a.updatedAt
-      const right = b.completedAt ?? b.updatedAt
-      return right.localeCompare(left)
-    }),
-    [data],
-  )
-
-  const timeline = useMemo(() => buildTimeline(openTodos), [openTodos])
 
   function toggleDateGroup(dateKey: string) {
     setCollapsedDates((current) => {
@@ -657,87 +109,43 @@ export default function App() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-
     if (!form.title.trim()) {
-      setError('请输入任务标题')
       return
     }
 
-    setSubmitting(true)
-    setError(null)
-    setNotice(null)
-
-    try {
-      const isEditing = editingTodoId !== null
-      let savedTodo: Todo
-
-      if (isEditing) {
-        savedTodo = await updateTodo(editingTodoId, {
-          title: form.title.trim(),
-          notes: form.notes.trim(),
-          tags: form.tags,
-          dueDate: form.dueDate,
-        })
-      } else {
-        savedTodo = await createTodo({
-          title: form.title.trim(),
-          notes: form.notes.trim(),
-          tags: form.tags,
-          dueDate: form.dueDate,
-        })
-      }
-
-      if (formFiles.length > 0) {
-        setUploadingId(savedTodo.id)
-        for (const file of formFiles) {
-          await uploadAttachment(savedTodo.id, file)
-        }
-      }
-
-      resetForm()
-      await refresh()
-      setNotice(
-        formFiles.length > 0
-          ? isEditing
-            ? '任务已更新，附件已上传。'
-            : '任务已创建，附件已上传。'
-          : isEditing
-            ? '任务已更新。'
-            : '任务已创建。',
-      )
-    } catch (submitError) {
-      setError(
-        submitError instanceof Error
-          ? submitError.message
-          : editingTodoId
-            ? '更新任务失败'
-            : '创建任务失败',
-      )
-    } finally {
-      setSubmitting(false)
-      setUploadingId(null)
+    const input = {
+      title: form.title.trim(),
+      notes: form.notes.trim(),
+      tags: form.tags,
+      dueDate: form.dueDate,
     }
+
+    if (editingTodoId) {
+      await updateTodo(editingTodoId, input, formFiles)
+    } else {
+      await createTodo(input, formFiles)
+    }
+
+    resetForm()
   }
 
-  function handleEdit(todo: Todo) {
-    if (todo.completed) {
-      return
-    }
+  function addFormTag() {
+    const tag = normalizeTag(form.tagInput)
+    if (!tag) return
 
-    setEditingTodoId(todo.id)
-    setForm({
-      title: todo.title,
-      notes: todo.notes,
-      tagInput: '',
-      tags: todo.tags,
-      dueDate: todo.dueDate ?? '',
+    setForm((current) => {
+      if (current.tags.includes(tag) || current.tags.length >= 6) {
+        return { ...current, tagInput: '' }
+      }
+      return { ...current, tagInput: '', tags: [...current.tags, tag] }
     })
-    setFormFiles([])
-    if (formFileInputRef.current) {
-      formFileInputRef.current.value = ''
-    }
-    setError(null)
-    setNotice('正在编辑任务。')
+  }
+
+  function removeFormTag(tag: string) {
+    setForm((current) => ({
+      ...current,
+      tags: current.tags.filter((item) => item !== tag),
+    }))
   }
 
   function handleFormFilesChange(event: ChangeEvent<HTMLInputElement>) {
@@ -751,113 +159,49 @@ export default function App() {
     }
   }
 
-  function addFormTag() {
-    const tag = normalizeTag(form.tagInput)
-    if (!tag) {
-      return
-    }
-
-    setForm((current) => {
-      if (current.tags.includes(tag) || current.tags.length >= 6) {
-        return { ...current, tagInput: '' }
-      }
-
-      return {
-        ...current,
-        tagInput: '',
-        tags: [...current.tags, tag],
-      }
-    })
-  }
-
-  function removeFormTag(tag: string) {
-    setForm((current) => ({
-      ...current,
-      tags: current.tags.filter((item) => item !== tag),
-    }))
+  async function handleUpload(todo: Todo, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    await uploadAttachment(todo, file)
   }
 
   async function handleToggle(todo: Todo) {
-    setBusyId(todo.id)
-    setError(null)
-    setNotice(null)
-
-    try {
-      await updateTodo(todo.id, { completed: !todo.completed })
-      if (!todo.completed && editingTodoId === todo.id) {
-        resetForm()
-      }
-      await refresh()
-      if (!todo.completed) {
-        setNotice('任务已完成。')
-      }
-    } catch (toggleError) {
-      setError(toggleError instanceof Error ? toggleError.message : '更新任务失败')
-    } finally {
-      setBusyId(null)
+    await toggleTodo(todo)
+    if (!todo.completed && editingTodoId === todo.id) {
+      resetForm()
     }
   }
 
   async function handleDelete(id: string) {
-    setBusyId(id)
-    setError(null)
-    setNotice(null)
-
-    try {
-      await deleteTodo(id)
-      if (editingTodoId === id) {
-        resetForm()
-      }
-      await refresh()
-      setNotice('任务已删除。')
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : '删除任务失败')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  async function handleUpload(todo: Todo, event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-
-    if (!file) {
-      return
-    }
-
-    setUploadingId(todo.id)
-    setError(null)
-    setNotice(null)
-
-    try {
-      await uploadAttachment(todo.id, file)
-      await refresh()
-      setNotice(`附件已上传：${file.name}`)
-    } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : '附件上传失败')
-    } finally {
-      setUploadingId(null)
-    }
-  }
-
-  async function handleDeleteAttachment(todo: Todo, attachment: TodoAttachment) {
-    setBusyId(todo.id)
-    setError(null)
-    setNotice(null)
-
-    try {
-      await deleteAttachment(attachment.id)
-      await refresh()
-      setNotice(`附件已删除：${attachment.fileName}`)
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : '删除附件失败')
-    } finally {
-      setBusyId(null)
+    await deleteTodo(id)
+    if (editingTodoId === id) {
+      resetForm()
     }
   }
 
   return (
     <main className="min-h-screen bg-paper text-ink">
+      {lock.locked && (
+        <LockScreen
+          hasPassword={lock.hasPassword}
+          onUnlock={lock.unlock}
+          onSetPassword={lock.setPassword}
+        />
+      )}
+
+      {lock.showSettings && (
+        <SecuritySettings
+          hasPassword={lock.hasPassword}
+          timeoutMs={lock.timeoutMs}
+          timeoutOptions={lock.TIMEOUT_OPTIONS}
+          onClose={() => lock.setShowSettings(false)}
+          onChangePassword={lock.changePassword}
+          onRemovePassword={lock.removePassword}
+          onSetTimeout={lock.setTimeout}
+        />
+      )}
+
       <div className="todo-layout">
         <section className="control-panel">
           <section className="control-card workspace-panel bg-white">
@@ -870,15 +214,25 @@ export default function App() {
                     </p>
                     <h1 className="new-task-title mt-1 text-xl font-bold text-ink">ToDo</h1>
                   </div>
-                  {editingTodoId && (
+                  <div className="flex items-center gap-2">
+                    {editingTodoId && (
+                      <button
+                        type="button"
+                        onClick={resetForm}
+                        className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper"
+                      >
+                        取消
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={resetForm}
-                      className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper"
+                      onClick={() => lock.setShowSettings(true)}
+                      title="安全设置"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-smoke transition hover:bg-paper hover:text-ink"
                     >
-                      取消
+                      &#9881;
                     </button>
-                  )}
+                  </div>
                 </div>
 
                 <div className="overview-inline" aria-label="任务总览">
@@ -887,10 +241,10 @@ export default function App() {
                     <span className="text-[11px] text-smoke">按日期</span>
                   </div>
                   <div className="stats-grid">
-                    <StatCard label="总任务" value={data?.stats.total ?? 0} />
-                    <StatCard label="待完成" value={data?.stats.open ?? 0} />
-                    <StatCard label="已完成" value={data?.stats.done ?? 0} />
-                    <StatCard label="有标签" value={data?.stats.tagged ?? 0} />
+                    <StatCard label="总任务" value={state.stats.total} />
+                    <StatCard label="待完成" value={state.stats.open} />
+                    <StatCard label="已完成" value={state.stats.done} />
+                    <StatCard label="有标签" value={state.stats.tagged} />
                   </div>
                 </div>
               </div>
@@ -1073,7 +427,7 @@ export default function App() {
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onUpload={handleUpload}
-                  onDeleteAttachment={handleDeleteAttachment}
+                  onDeleteAttachment={deleteAttachment}
                 />
               ))
             ) : (
@@ -1098,7 +452,7 @@ export default function App() {
           onToggle={handleToggle}
           onDelete={handleDelete}
           onUpload={handleUpload}
-          onDeleteAttachment={handleDeleteAttachment}
+          onDeleteAttachment={deleteAttachment}
         />
       )}
     </main>
