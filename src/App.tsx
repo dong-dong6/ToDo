@@ -185,6 +185,7 @@ export default function App() {
       {lock.locked && (
         <LockScreen
           hasPassword={lock.hasPassword}
+          checking={lock.checking}
           onUnlock={lock.unlock}
           onSetPassword={lock.setPassword}
         />

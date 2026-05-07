@@ -114,6 +114,34 @@ export async function readRequestJson<T>(request: Request): Promise<T | null> {
   return JSON.parse(text) as T
 }
 
+export async function ensureSettingsTable(env: Env) {
+  await env.TODO_DB.prepare(
+    `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+  ).run()
+}
+
+export async function getSetting(env: Env, key: string): Promise<string | null> {
+  await ensureSettingsTable(env)
+  const row = await env.TODO_DB.prepare('SELECT value FROM settings WHERE key = ?1')
+    .bind(key)
+    .first<{ value: string }>()
+  return row?.value ?? null
+}
+
+export async function setSetting(env: Env, key: string, value: string) {
+  await ensureSettingsTable(env)
+  await env.TODO_DB.prepare(
+    'INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = ?2',
+  )
+    .bind(key, value)
+    .run()
+}
+
+export async function deleteSetting(env: Env, key: string) {
+  await ensureSettingsTable(env)
+  await env.TODO_DB.prepare('DELETE FROM settings WHERE key = ?1').bind(key).run()
+}
+
 export async function getTodoById(env: Env, id: string) {
   await ensureTodoTagsColumn(env)
 

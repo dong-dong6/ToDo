@@ -28,4 +28,9 @@ CREATE TABLE IF NOT EXISTS todo_attachments (
 CREATE INDEX IF NOT EXISTS idx_todo_attachments_todo_created_at
 ON todo_attachments (todo_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 DROP TABLE IF EXISTS snapshot_exports;

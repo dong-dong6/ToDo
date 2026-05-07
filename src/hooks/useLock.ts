@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import * as api from '../lib/api'
 
-const STORAGE_KEY_HASH = 'lock_password_hash'
+const STORAGE_KEY_TOKEN = 'lock_token'
 const STORAGE_KEY_TIMEOUT = 'lock_timeout'
-const SESSION_KEY_UNLOCKED = 'lock_unlocked'
 const DEFAULT_TIMEOUT = 5 * 60 * 1000
 
 const ACTIVITY_EVENTS = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'] as const
@@ -15,14 +15,16 @@ const TIMEOUT_OPTIONS: { label: string; value: number }[] = [
   { label: '永不', value: 0 },
 ]
 
-async function hashPassword(password: string): Promise<string> {
-  const data = new TextEncoder().encode(password)
-  const hash = await crypto.subtle.digest('SHA-256', data)
-  return btoa(String.fromCharCode(...new Uint8Array(hash)))
+function getStoredToken(): string | null {
+  return sessionStorage.getItem(STORAGE_KEY_TOKEN)
 }
 
-function getStoredHash(): string | null {
-  return localStorage.getItem(STORAGE_KEY_HASH)
+function storeToken(token: string) {
+  sessionStorage.setItem(STORAGE_KEY_TOKEN, token)
+}
+
+function clearToken() {
+  sessionStorage.removeItem(STORAGE_KEY_TOKEN)
 }
 
 function getStoredTimeout(): number {
@@ -32,21 +34,10 @@ function getStoredTimeout(): number {
   return Number.isFinite(n) && n >= 0 ? n : DEFAULT_TIMEOUT
 }
 
-function isSessionUnlocked(): boolean {
-  return sessionStorage.getItem(SESSION_KEY_UNLOCKED) === '1'
-}
-
-function setSessionUnlocked(value: boolean) {
-  if (value) {
-    sessionStorage.setItem(SESSION_KEY_UNLOCKED, '1')
-  } else {
-    sessionStorage.removeItem(SESSION_KEY_UNLOCKED)
-  }
-}
-
 export function useLock() {
   const [locked, setLocked] = useState(true)
-  const [hasPassword, setHasPassword] = useState(() => !!getStoredHash())
+  const [hasPassword, setHasPassword] = useState(false)
+  const [checking, setChecking] = useState(true)
   const [timeoutMs, setTimeoutMs] = useState(getStoredTimeout)
   const [showSettings, setShowSettings] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
@@ -55,7 +46,7 @@ export function useLock() {
   const doLock = useCallback(() => {
     if (!unlockedRef.current) return
     unlockedRef.current = false
-    setSessionUnlocked(false)
+    clearToken()
     setLocked(true)
     setShowSettings(false)
   }, [])
@@ -67,19 +58,23 @@ export function useLock() {
     }
   }, [timeoutMs, doLock])
 
+  // Check auth status on mount
   useEffect(() => {
-    if (!hasPassword) {
-      unlockedRef.current = true
-      setLocked(false)
-      return
-    }
-    if (isSessionUnlocked()) {
-      unlockedRef.current = true
-      setLocked(false)
-      resetTimer()
-    }
-  }, [hasPassword, resetTimer])
+    const token = getStoredToken()
+    api.getAuthStatus(token).then((status) => {
+      setHasPassword(status.hasPassword)
+      if (status.authenticated) {
+        unlockedRef.current = true
+        setLocked(false)
+        resetTimer()
+      }
+      setChecking(false)
+    }).catch(() => {
+      setChecking(false)
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Activity listeners
   useEffect(() => {
     if (locked) return
 
@@ -106,26 +101,26 @@ export function useLock() {
 
   const unlock = useCallback(
     async (password: string): Promise<boolean> => {
-      const stored = getStoredHash()
-      if (!stored) return false
-      const hash = await hashPassword(password)
-      if (hash !== stored) return false
-      unlockedRef.current = true
-      setSessionUnlocked(true)
-      setLocked(false)
-      resetTimer()
-      return true
+      try {
+        const { token } = await api.authVerify(password)
+        storeToken(token)
+        unlockedRef.current = true
+        setLocked(false)
+        resetTimer()
+        return true
+      } catch {
+        return false
+      }
     },
     [resetTimer],
   )
 
   const setPassword = useCallback(
     async (password: string) => {
-      const hash = await hashPassword(password)
-      localStorage.setItem(STORAGE_KEY_HASH, hash)
+      const { token } = await api.authSetPassword(password)
+      storeToken(token)
       setHasPassword(true)
       unlockedRef.current = true
-      setSessionUnlocked(true)
       setLocked(false)
       resetTimer()
     },
@@ -133,28 +128,27 @@ export function useLock() {
   )
 
   const changePassword = useCallback(async (oldPassword: string, newPassword: string): Promise<boolean> => {
-    const stored = getStoredHash()
-    if (!stored) return false
-    const oldHash = await hashPassword(oldPassword)
-    if (oldHash !== stored) return false
-    const newHash = await hashPassword(newPassword)
-    localStorage.setItem(STORAGE_KEY_HASH, newHash)
-    return true
+    try {
+      await api.authChangePassword(oldPassword, newPassword)
+      return true
+    } catch {
+      return false
+    }
   }, [])
 
   const removePassword = useCallback(
     async (password: string): Promise<boolean> => {
-      const stored = getStoredHash()
-      if (!stored) return false
-      const hash = await hashPassword(password)
-      if (hash !== stored) return false
-      localStorage.removeItem(STORAGE_KEY_HASH)
-      setHasPassword(false)
-      unlockedRef.current = true
-      setSessionUnlocked(true)
-      setLocked(false)
-      if (timerRef.current) clearTimeout(timerRef.current)
-      return true
+      try {
+        await api.authRemovePassword(password)
+        clearToken()
+        setHasPassword(false)
+        unlockedRef.current = true
+        setLocked(false)
+        if (timerRef.current) clearTimeout(timerRef.current)
+        return true
+      } catch {
+        return false
+      }
     },
     [],
   )
@@ -167,6 +161,7 @@ export function useLock() {
   return {
     locked,
     hasPassword,
+    checking,
     timeoutMs,
     showSettings,
     setShowSettings,

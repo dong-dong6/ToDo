@@ -1,4 +1,5 @@
 import { deleteAttachment, getAttachmentFile, uploadAttachment } from './attachments'
+import { changePassword, getAuthStatus, removePassword, setPassword, verify } from './auth'
 import { error, methodNotAllowed } from './db'
 import { createTodo, deleteTodo, listTodos, updateTodo } from './todos'
 import type { Env } from './types'
@@ -35,6 +36,32 @@ async function handleApiRequest(request: Request, env: Env, pathname: string) {
 
   if (segments[0] !== 'api') {
     return error('Not found', 404)
+  }
+
+  if (segments[1] === 'auth') {
+    if (segments.length === 3) {
+      if (segments[2] === 'status' && request.method === 'GET') {
+        return getAuthStatus(env, request)
+      }
+
+      if (segments[2] === 'verify' && request.method === 'POST') {
+        return verify(request, env)
+      }
+
+      if (segments[2] === 'set-password' && request.method === 'POST') {
+        return setPassword(request, env)
+      }
+
+      if (segments[2] === 'change-password' && request.method === 'POST') {
+        return changePassword(request, env)
+      }
+
+      if (segments[2] === 'remove-password' && request.method === 'POST') {
+        return removePassword(request, env)
+      }
+
+      return methodNotAllowed(['GET', 'POST'])
+    }
   }
 
   if (segments[1] === 'todos') {

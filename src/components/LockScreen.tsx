@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react'
 
 export function LockScreen(props: {
   hasPassword: boolean
+  checking: boolean
   onUnlock: (password: string) => Promise<boolean>
   onSetPassword: (password: string) => Promise<void>
 }) {
@@ -38,6 +39,17 @@ export function LockScreen(props: {
     setError('')
     await props.onSetPassword(password)
     setBusy(false)
+  }
+
+  if (props.checking) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-paper">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-ink">ToDo</h1>
+          <p className="mt-4 text-sm text-smoke">验证中...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

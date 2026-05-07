@@ -9,6 +9,49 @@ async function parseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>
 }
 
+export async function getAuthStatus(token: string | null): Promise<{ hasPassword: boolean; authenticated: boolean }> {
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const response = await fetch('/api/auth/status', { headers })
+  return parseJson(response)
+}
+
+export async function authVerify(password: string): Promise<{ token: string; expiresAt: number }> {
+  const response = await fetch('/api/auth/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  return parseJson(response)
+}
+
+export async function authSetPassword(password: string): Promise<{ token: string; expiresAt: number }> {
+  const response = await fetch('/api/auth/set-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  return parseJson(response)
+}
+
+export async function authChangePassword(oldPassword: string, newPassword: string): Promise<{ success: boolean }> {
+  const response = await fetch('/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ oldPassword, newPassword }),
+  })
+  return parseJson(response)
+}
+
+export async function authRemovePassword(password: string): Promise<{ success: boolean }> {
+  const response = await fetch('/api/auth/remove-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  return parseJson(response)
+}
+
 export async function getTodos(): Promise<TodoResponse> {
   const response = await fetch('/api/todos')
   return parseJson<TodoResponse>(response)
