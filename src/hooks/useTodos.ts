@@ -10,7 +10,7 @@ import type { CreateTodoInput, Todo, TodoAttachment, UpdateTodoInput } from '../
 
 const INITIAL_STATE: TodoState = { todos: [], stats: { total: 0, open: 0, done: 0, tagged: 0 } }
 
-export function useTodos() {
+export function useTodos(enabled: boolean) {
   const [state, dispatch] = useReducer(todoReducer, INITIAL_STATE)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -45,8 +45,8 @@ export function useTodos() {
   }, [])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    if (enabled) void refresh()
+  }, [refresh, enabled])
 
   const clearNotice = useCallback(() => setNotice(null), [])
   const clearError = useCallback(() => setError(null), [])

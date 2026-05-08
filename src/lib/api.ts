@@ -1,5 +1,10 @@
 import type { CreateTodoInput, Todo, TodoAttachment, TodoResponse, UpdateTodoInput } from './types'
 
+function authHeaders(): Record<string, string> {
+  const token = sessionStorage.getItem('lock_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const text = await response.text()
@@ -53,7 +58,7 @@ export async function authRemovePassword(password: string): Promise<{ success: b
 }
 
 export async function getTodos(): Promise<TodoResponse> {
-  const response = await fetch('/api/todos')
+  const response = await fetch('/api/todos', { headers: authHeaders() })
   return parseJson<TodoResponse>(response)
 }
 
@@ -62,6 +67,7 @@ export async function createTodo(input: CreateTodoInput): Promise<Todo> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders(),
     },
     body: JSON.stringify(input),
   })
@@ -74,6 +80,7 @@ export async function updateTodo(id: string, input: UpdateTodoInput): Promise<To
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders(),
     },
     body: JSON.stringify(input),
   })
@@ -84,6 +91,7 @@ export async function updateTodo(id: string, input: UpdateTodoInput): Promise<To
 export async function deleteTodo(id: string): Promise<void> {
   const response = await fetch(`/api/todos/${id}`, {
     method: 'DELETE',
+    headers: authHeaders(),
   })
 
   if (!response.ok) {
@@ -97,6 +105,7 @@ export async function uploadAttachment(todoId: string, file: File): Promise<Todo
   formData.append('file', file)
   const response = await fetch(`/api/todos/${todoId}/attachments`, {
     method: 'POST',
+    headers: authHeaders(),
     body: formData,
   })
 
@@ -106,6 +115,7 @@ export async function uploadAttachment(todoId: string, file: File): Promise<Todo
 export async function deleteAttachment(id: string): Promise<void> {
   const response = await fetch(`/api/attachments/${id}`, {
     method: 'DELETE',
+    headers: authHeaders(),
   })
 
   if (!response.ok) {

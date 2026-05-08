@@ -1,5 +1,5 @@
 import { deleteAttachment, getAttachmentFile, uploadAttachment } from './attachments'
-import { changePassword, getAuthStatus, removePassword, setPassword, verify } from './auth'
+import { changePassword, getAuthStatus, removePassword, requireAuth, setPassword, verify } from './auth'
 import { error, methodNotAllowed } from './db'
 import { createTodo, deleteTodo, listTodos, updateTodo } from './todos'
 import type { Env } from './types'
@@ -62,6 +62,12 @@ async function handleApiRequest(request: Request, env: Env, pathname: string) {
 
       return methodNotAllowed(['GET', 'POST'])
     }
+  }
+
+  // Auth gate for all data endpoints
+  if (segments[1] === 'todos' || segments[1] === 'attachments') {
+    const authResponse = await requireAuth(env, request)
+    if (authResponse) return authResponse
   }
 
   if (segments[1] === 'todos') {

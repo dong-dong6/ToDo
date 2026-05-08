@@ -142,3 +142,26 @@ function extractToken(request: Request): string | null {
   }
   return null
 }
+
+export async function requireAuth(env: Env, request: Request): Promise<Response | null> {
+  const stored = await getSetting(env, 'password_hash')
+  if (!stored) return null // no password set — open mode
+
+  const token = extractToken(request)
+  if (!token) {
+    return error('Authentication required', 401)
+  }
+
+  const sessionData = await getSetting(env, 'session_token')
+  if (!sessionData) {
+    return error('Authentication required', 401)
+  }
+
+  const [storedToken, expiresAt] = sessionData.split(':')
+  if (token !== storedToken || Date.now() > Number(expiresAt)) {
+    await deleteSetting(env, 'session_token')
+    return error('Authentication required', 401)
+  }
+
+  return null // valid
+}

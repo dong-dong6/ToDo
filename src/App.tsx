@@ -25,6 +25,8 @@ const initialForm = {
 }
 
 export default function App() {
+  const lock = useLock()
+
   const {
     state,
     loading,
@@ -41,9 +43,7 @@ export default function App() {
     deleteTodo,
     uploadAttachment,
     deleteAttachment,
-  } = useTodos()
-
-  const lock = useLock()
+  } = useTodos(!lock.locked && !lock.checking)
 
   const [form, setForm] = useState(initialForm)
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
